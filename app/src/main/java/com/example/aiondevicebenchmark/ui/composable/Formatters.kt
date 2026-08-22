@@ -40,3 +40,8 @@ fun formatFileSizeGb(bytes: Long?): String {
     if (bytes == null) return ""
     return "%.2f GB".format(Locale.getDefault(), bytes / 1_000_000_000.0)
 }
+
+fun formatFileSizeMb(bytes: Long?): String {
+    if (bytes == null) return ""
+    return "%.0f MB".format(Locale.getDefault(), bytes / 1_000_000.0)
+}

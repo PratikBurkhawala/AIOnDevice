@@ -70,12 +70,7 @@ private fun MutableList<Pair<String, String>>.flattenJson(path: String, element:
 private fun String.child(key: String): String = if (isBlank()) key else "$this.$key"
 
 private fun displayLabel(path: String): String {
-    return when {
-        path.endsWith("fileSizeBytes") -> path.removeSuffix("Bytes") + "GB"
-        path.endsWith("peakAppPssMb") -> path.removeSuffix("peakAppPssMb") + "Peak RAM"
-        isMillisecondPath(path) -> path.removeSuffix("Ms") + "Seconds"
-        else -> path
-    }
+    return labelOverrides[path] ?: readablePath(path)
 }
 
 private fun displayPrimitive(path: String, primitive: JsonPrimitive): String {
@@ -116,4 +111,130 @@ private fun String.isPlaceholder(): Boolean {
         equals("NOT_AVAILABLE", ignoreCase = true) ||
         equals("NOT_MEASURED", ignoreCase = true) ||
         equals("not available", ignoreCase = true)
+}
+
+private val labelOverrides = mapOf(
+    "run.runId" to "Run ID",
+    "run.runGroupId" to "Run Group",
+    "run.timestamp.start" to "Start Time",
+    "run.timestamp.end" to "End Time",
+    "run.condition.type" to "Condition",
+    "run.condition.batterySaver" to "Battery Saver",
+    "run.condition.charging" to "Charging",
+    "run.condition.screenOn" to "Screen On",
+    "run.condition.appState" to "App State",
+    "run.condition.memoryPressure" to "Memory Pressure",
+    "run.condition.consecutiveGenerationNumber" to "Generation Number",
+    "run.condition.totalConsecutiveGenerations" to "Total Generations",
+    "device.manufacturer" to "Device Manufacturer",
+    "device.model" to "Device Model",
+    "device.androidVersion" to "Android Version",
+    "device.apiLevel" to "Android API Level",
+    "device.soc.manufacturer" to "SoC Manufacturer",
+    "device.soc.model" to "SoC Model",
+    "device.cpu.architecture" to "CPU Architecture",
+    "device.cpu.cores" to "CPU Cores",
+    "device.gpu.name" to "GPU Name",
+    "device.npu.name" to "NPU Name",
+    "device.npu.available" to "NPU Available",
+    "device.ram.totalMb" to "Total RAM",
+    "runtime.engine" to "Engine",
+    "runtime.version" to "Engine Version",
+    "runtime.backend" to "Backend",
+    "runtime.threads" to "Threads",
+    "runtime.gpuLayers" to "GPU Layers",
+    "model.name" to "Model Name",
+    "model.parameters" to "Model Parameters",
+    "model.format" to "Model Format",
+    "model.fileName" to "Model File",
+    "model.filePath" to "Model Path",
+    "model.quantization" to "Quantization",
+    "model.fileSizeBytes" to "Model File Size",
+    "model.contextSize" to "Context Size",
+    "model.maxOutputTokens" to "Max Output Tokens",
+    "generationConfig.temperature" to "Temperature",
+    "generationConfig.topK" to "Top K",
+    "generationConfig.topP" to "Top P",
+    "generationConfig.seed" to "Seed",
+    "prompt.promptId" to "Prompt ID",
+    "prompt.inputTokenCount" to "Input Tokens",
+    "prompt.outputTokenTarget" to "Output Token Target",
+    "modelLoading.loadStart" to "Model Load Start",
+    "modelLoading.loadEnd" to "Model Load End",
+    "modelLoading.loadTimeMs" to "Model Load Time",
+    "modelLoading.ramBeforeLoadMb" to "RAM Before Load",
+    "modelLoading.ramAfterLoadMb" to "RAM After Load",
+    "inference.generationStart" to "Generation Start",
+    "inference.firstTokenTime" to "First Token Time",
+    "inference.generatedText" to "Generated Response",
+    "inference.ttftMs" to "Time To First Token",
+    "inference.prefill.durationMs" to "Prefill Time",
+    "inference.prefill.tokens" to "Prefill Tokens",
+    "inference.prefill.tokensPerSecond" to "Prefill Tokens Per Second",
+    "inference.decode.durationMs" to "Decode Time",
+    "inference.decode.tokens" to "Decode Tokens",
+    "inference.decode.tokensPerSecond" to "Decode Tokens Per Second",
+    "inference.total.durationMs" to "Total Inference Time",
+    "inference.total.outputTokens" to "Output Tokens",
+    "inference.total.generationEnd" to "Generation End",
+    "memory.beforeGenerationMb" to "RAM Before Generation",
+    "memory.peakAppPssMb" to "Peak RAM",
+    "memory.afterGenerationMb" to "RAM After Generation",
+    "memory.afterModelUnloadMb" to "RAM After Model Unload",
+    "battery.beforePercentage" to "Battery Before",
+    "battery.afterPercentage" to "Battery After",
+    "battery.drainPercentage" to "Battery Drain",
+    "battery.temperatureBeforeC" to "Battery Temperature Before",
+    "battery.temperatureAfterC" to "Battery Temperature After",
+    "battery.thermalStatus" to "Thermal Status",
+    "hardware.backend" to "Hardware Backend",
+    "hardware.cpu.used" to "CPU Used",
+    "hardware.cpu.utilizationPercent" to "CPU Utilization",
+    "hardware.cpu.measurementStatus" to "CPU Measurement Status",
+    "hardware.gpu.used" to "GPU Used",
+    "hardware.gpu.utilizationPercent" to "GPU Utilization",
+    "hardware.gpu.measurementStatus" to "GPU Measurement Status",
+    "hardware.npu.used" to "NPU Used",
+    "hardware.npu.utilizationPercent" to "NPU Utilization",
+    "hardware.npu.measurementStatus" to "NPU Measurement Status",
+    "hardware.profiling.tool" to "Profiling Tool",
+    "hardware.profiling.evidence" to "Profiling Evidence",
+    "modelUnloading.unloadStart" to "Model Unload Start",
+    "modelUnloading.unloadEnd" to "Model Unload End",
+    "modelUnloading.unloadTimeMs" to "Model Unload Time",
+    "result.status" to "Status",
+    "result.error" to "Error",
+    "observation.summary" to "Observation Summary",
+)
+
+private fun readablePath(path: String): String {
+    val memorySample = Regex("""memory\.samples\[(\d+)]\.(timestamp|appPssMb)""").matchEntire(path)
+    if (memorySample != null) {
+        val index = memorySample.groupValues[1].toInt() + 1
+        return when (memorySample.groupValues[2]) {
+            "timestamp" -> "Memory Sample $index Time"
+            else -> "Memory Sample $index RAM"
+        }
+    }
+
+    val listItem = Regex("""(.+)\[(\d+)]""").matchEntire(path)
+    if (listItem != null) {
+        val index = listItem.groupValues[2].toInt() + 1
+        return "${listItem.groupValues[1].substringAfterLast('.').toDisplayWords()} $index"
+    }
+
+    return path
+        .split('.')
+        .joinToString(" - ") { it.toDisplayWords() }
+}
+
+private fun String.toDisplayWords(): String {
+    return replace(Regex("""\[(\d+)]""")) { match ->
+        " ${match.groupValues[1].toInt() + 1}"
+    }
+        .replace(Regex("""([a-z])([A-Z])"""), "$1 $2")
+        .replace("Pss", "PSS")
+        .replace("Mb", "MB")
+        .replace("Ms", "Time")
+        .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
 }

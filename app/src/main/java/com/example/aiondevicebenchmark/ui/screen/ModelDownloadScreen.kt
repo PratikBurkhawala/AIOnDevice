@@ -21,7 +21,7 @@ import com.example.aiondevicebenchmark.llm.ModelConfig
 import com.example.aiondevicebenchmark.ui.benchmark.BenchmarkUiEvent
 import com.example.aiondevicebenchmark.ui.composable.KeyValueRow
 import com.example.aiondevicebenchmark.ui.composable.SectionTitle
-import com.example.aiondevicebenchmark.ui.composable.formatFileSizeGb
+import com.example.aiondevicebenchmark.ui.composable.formatFileSizeMb
 
 @Composable
 fun ModelDownloadScreen(
@@ -77,7 +77,7 @@ private fun ModelDownloadItem(
         )
         Text(model.description, style = MaterialTheme.typography.bodySmall)
         KeyValueRow("Quantization", model.quantization)
-        KeyValueRow("Size", model.downloadSizeLabel)
+        KeyValueRow("Size", model.fileSizeBytes?.let { formatFileSizeMb(it) } ?: model.downloadSizeLabel)
         KeyValueRow("Status", state?.message ?: "Not downloaded")
 
         if (isDownloading) {
@@ -121,5 +121,5 @@ private fun downloadProgressText(state: ModelDownloadState): String {
 }
 
 private fun formatBytes(bytes: Long): String {
-    return formatFileSizeGb(bytes)
+    return formatFileSizeMb(bytes)
 }

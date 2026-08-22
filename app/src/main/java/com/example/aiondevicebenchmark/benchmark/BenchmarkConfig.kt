@@ -20,6 +20,7 @@ data class BenchmarkConfig(
         parameters = "0.5B",
         fileName = "Qwen2.5-0.5B-Instruct-Q4_K_M.gguf",
         quantization = "Q4_K_M",
+        fileSizeBytes = 400_000_000L,
         downloadUrl = "https://huggingface.co/bartowski/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf",
         downloadSizeLabel = "0.40 GB",
         description = "Smallest option. Good quality for first device tests and lower RAM phones.",

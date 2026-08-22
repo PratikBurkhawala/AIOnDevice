@@ -9,6 +9,7 @@ import com.example.aiondevicebenchmark.llm.ModelConfig
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -202,7 +203,13 @@ class ModelDownloadRepositoryImpl(
             fileName = model.fileName,
             engineFolder = model.engineType.storageName,
             status = ModelDownloadStatus.NotDownloaded,
-            message = if (model.downloadSizeLabel.isBlank()) "Not downloaded" else "Not downloaded (${model.downloadSizeLabel})",
+            message = model.fileSizeBytes
+                ?.let { "Not downloaded (${formatFileSizeMb(it)})" }
+                ?: "Not downloaded",
         )
+    }
+
+    private fun formatFileSizeMb(bytes: Long): String {
+        return "%.0f MB".format(Locale.getDefault(), bytes / 1_000_000.0)
     }
 }
