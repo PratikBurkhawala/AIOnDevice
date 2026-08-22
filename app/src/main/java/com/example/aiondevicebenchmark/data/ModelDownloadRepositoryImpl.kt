@@ -62,6 +62,20 @@ class ModelDownloadRepositoryImpl(
         }
     }
 
+    override fun deleteModel(model: ModelConfig): Boolean {
+        if (stateFor(model).isDownloading) {
+            setState(model, stateFor(model).copy(message = "Cannot delete while download is running."))
+            return false
+        }
+        val destination = localFile(model)
+        val partial = File(destination.parentFile, "${destination.name}.part")
+        val deleted = listOf(destination, partial)
+            .filter { it.exists() }
+            .fold(false) { anyDeleted, file -> file.delete() || anyDeleted }
+        setState(model, notDownloadedState(model))
+        return deleted
+    }
+
     override fun stateFor(model: ModelConfig): ModelDownloadState {
         val current = states.value[stateKey(model)]
         if (current != null) return current

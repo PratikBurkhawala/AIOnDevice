@@ -23,6 +23,12 @@ class StartModelDownloadUseCase(
     operator fun invoke(model: ModelConfig) = repository.startDownload(model)
 }
 
+class DeleteModelUseCase(
+    private val repository: ModelDownloadRepository,
+) {
+    operator fun invoke(model: ModelConfig): Boolean = repository.deleteModel(model)
+}
+
 class LocalizeModelUseCase(
     private val repository: ModelDownloadRepository,
 ) {

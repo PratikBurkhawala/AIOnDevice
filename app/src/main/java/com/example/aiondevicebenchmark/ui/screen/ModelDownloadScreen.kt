@@ -104,6 +104,12 @@ private fun ModelDownloadItem(
             ) {
                 Text("Use")
             }
+            OutlinedButton(
+                onClick = { onEvent(BenchmarkUiEvent.DeleteModel(model)) },
+                enabled = !isDownloading && isDownloaded,
+            ) {
+                Text("Delete")
+            }
         }
     }
 }

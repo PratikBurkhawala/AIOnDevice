@@ -7,6 +7,7 @@ import com.example.aiondevicebenchmark.data.ModelDownloadRepositoryImpl
 import com.example.aiondevicebenchmark.domain.repository.BenchmarkResultRepository
 import com.example.aiondevicebenchmark.domain.repository.ModelDownloadRepository
 import com.example.aiondevicebenchmark.domain.usecase.DeleteSavedJsonFileUseCase
+import com.example.aiondevicebenchmark.domain.usecase.DeleteModelUseCase
 import com.example.aiondevicebenchmark.domain.usecase.DetectModelQuantizationUseCase
 import com.example.aiondevicebenchmark.domain.usecase.FindSavedJsonFileUseCase
 import com.example.aiondevicebenchmark.domain.usecase.GetDefaultModelForEngineUseCase
@@ -45,7 +46,7 @@ val appModule = module {
     single<ModelDownloadRepository> { ModelDownloadRepositoryImpl(androidContext(), get()) }
 
     factory { BenchmarkRunner(engineFactory = get(), telemetryCollector = get(), resultRepository = get()) }
-    factory { BenchmarkController(runner = get()) }
+    single { BenchmarkController(runner = get(), scope = get()) }
 
     factory { StartBenchmarkUseCase(controller = get()) }
     factory { ListSavedJsonFilesUseCase(repository = get()) }
@@ -59,6 +60,7 @@ val appModule = module {
     factory { ObserveModelDownloadsUseCase(repository = get()) }
     factory { RefreshModelDownloadsUseCase(repository = get()) }
     factory { StartModelDownloadUseCase(repository = get()) }
+    factory { DeleteModelUseCase(repository = get()) }
     factory { LocalizeModelUseCase(repository = get()) }
     factory { GetModelStorageDirectoryUseCase(repository = get()) }
 
@@ -76,6 +78,7 @@ val appModule = module {
             observeModelDownloadsUseCase = get(),
             refreshModelDownloadsUseCase = get(),
             startModelDownloadUseCase = get(),
+            deleteModelUseCase = get(),
             localizeModelUseCase = get(),
             getModelStorageDirectoryUseCase = get(),
         )

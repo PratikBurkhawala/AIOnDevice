@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.aiondevicebenchmark.benchmark.BenchmarkConfig
 import com.example.aiondevicebenchmark.benchmark.BenchmarkState
 import com.example.aiondevicebenchmark.domain.usecase.DeleteSavedJsonFileUseCase
+import com.example.aiondevicebenchmark.domain.usecase.DeleteModelUseCase
 import com.example.aiondevicebenchmark.domain.usecase.DetectModelQuantizationUseCase
 import com.example.aiondevicebenchmark.domain.usecase.FindSavedJsonFileUseCase
 import com.example.aiondevicebenchmark.domain.usecase.GetDefaultModelForEngineUseCase
@@ -41,6 +42,7 @@ class BenchmarkViewModel(
     private val observeModelDownloadsUseCase: ObserveModelDownloadsUseCase,
     private val refreshModelDownloadsUseCase: RefreshModelDownloadsUseCase,
     private val startModelDownloadUseCase: StartModelDownloadUseCase,
+    private val deleteModelUseCase: DeleteModelUseCase,
     private val localizeModelUseCase: LocalizeModelUseCase,
     private val getModelStorageDirectoryUseCase: GetModelStorageDirectoryUseCase,
 ) : ViewModel() {
@@ -59,6 +61,9 @@ class BenchmarkViewModel(
         viewModelScope.launch {
             startBenchmarkUseCase.state.collect { benchmarkState ->
                 _uiState.update { it.copy(benchmarkState = benchmarkState) }
+                if (benchmarkState is BenchmarkState.Completed) {
+                    refreshSavedFiles()
+                }
             }
         }
         viewModelScope.launch {
@@ -84,6 +89,7 @@ class BenchmarkViewModel(
             BenchmarkUiEvent.ShareReportCsv -> shareReportCsv()
             BenchmarkUiEvent.StartBenchmark -> startBenchmark()
             is BenchmarkUiEvent.DownloadModel -> downloadModel(event.model)
+            is BenchmarkUiEvent.DeleteModel -> deleteModel(event.model)
             is BenchmarkUiEvent.UseModel -> useModel(event.model)
             BenchmarkUiEvent.ClearMessage -> _uiState.update { it.copy(message = null) }
             is BenchmarkUiEvent.UpdateEngine -> update {
@@ -155,15 +161,30 @@ class BenchmarkViewModel(
         }
 
         _uiState.update { it.copy(focusResultRequest = it.focusResultRequest + 1, message = null) }
-        viewModelScope.launch {
-            startBenchmarkUseCase(_uiState.value.config)
-            refreshSavedFiles()
-        }
+        startBenchmarkUseCase(_uiState.value.config)
+        refreshSavedFiles()
     }
 
     private fun downloadModel(model: ModelConfig) {
         startModelDownloadUseCase(model)
-        _uiState.update { it.copy(message = "Downloading ${model.name}. Keep the app open until it completes.") }
+        _uiState.update { it.copy(message = "Downloading ${model.name}. The download continues while the app is in the background.") }
+    }
+
+    private fun deleteModel(model: ModelConfig) {
+        val prepared = prepareModel(model)
+        val deleted = deleteModelUseCase(prepared)
+        refreshModelDownloadsUseCase(_uiState.value.supportedModels)
+        _uiState.update { current ->
+            val selectedModel = if (current.config.model.downloadKey() == prepared.downloadKey()) {
+                current.config.model.copy(filePath = "", fileSizeBytes = null)
+            } else {
+                current.config.model
+            }
+            current.copy(
+                config = current.config.copy(model = selectedModel),
+                message = if (deleted) "${prepared.name} deleted." else "${prepared.name} is not downloaded.",
+            )
+        }
     }
 
     private fun useModel(model: ModelConfig) {

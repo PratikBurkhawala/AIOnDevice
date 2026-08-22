@@ -12,6 +12,7 @@ sealed interface BenchmarkUiEvent {
     data object ShareReportCsv : BenchmarkUiEvent
     data object StartBenchmark : BenchmarkUiEvent
     data class DownloadModel(val model: ModelConfig) : BenchmarkUiEvent
+    data class DeleteModel(val model: ModelConfig) : BenchmarkUiEvent
     data class UseModel(val model: ModelConfig) : BenchmarkUiEvent
     data object ClearMessage : BenchmarkUiEvent
     data class UpdateEngine(val value: EngineType) : BenchmarkUiEvent

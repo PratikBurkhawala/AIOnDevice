@@ -10,7 +10,7 @@ class StartBenchmarkUseCase(
 ) {
     val state: StateFlow<BenchmarkState> = controller.state
 
-    suspend operator fun invoke(config: BenchmarkConfig) {
+    operator fun invoke(config: BenchmarkConfig) {
         controller.start(config)
     }
 }

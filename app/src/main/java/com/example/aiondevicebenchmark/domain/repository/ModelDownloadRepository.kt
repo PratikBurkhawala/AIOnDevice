@@ -10,6 +10,7 @@ interface ModelDownloadRepository {
     val states: StateFlow<Map<String, ModelDownloadState>>
     fun refresh(models: List<ModelConfig>)
     fun startDownload(model: ModelConfig)
+    fun deleteModel(model: ModelConfig): Boolean
     fun stateFor(model: ModelConfig): ModelDownloadState
     fun localModel(model: ModelConfig): ModelConfig
     fun storageDirectory(engineType: EngineType): File

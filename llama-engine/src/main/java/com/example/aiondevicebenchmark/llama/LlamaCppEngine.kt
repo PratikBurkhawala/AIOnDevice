@@ -13,13 +13,16 @@ import com.example.aiondevicebenchmark.llm.UnloadResult
 import java.io.File
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
+import java.util.concurrent.ThreadFactory
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.withContext
 
 internal class LlamaCppEngine : LlmEngine {
+    private val nativeDispatcher = Executors.newSingleThreadExecutor(NativeThreadFactory).asCoroutineDispatcher()
     private var handle: Long = 0L
+    private var loadedModelName: String = ""
     private var engineInfo = EngineInfo(
         name = "llama.cpp",
         version = "native",
@@ -45,7 +48,7 @@ internal class LlamaCppEngine : LlmEngine {
         }
 
         val nativeResult = safeNative("Load model") {
-            withContext(Dispatchers.IO) {
+            withContext(nativeDispatcher) {
                 runWithTimeout(LOAD_TIMEOUT_MS, "Load model") {
                     NativeLlamaBridge.loadModel(
                         modelPath = model.filePath,
@@ -61,6 +64,7 @@ internal class LlamaCppEngine : LlmEngine {
         val load = nativeResult.third ?: return failure("Native load completed without a result.")
 
         handle = load.handle
+        loadedModelName = model.name
         engineInfo = EngineInfo(
             name = "llama.cpp",
             version = load.version,
@@ -79,8 +83,9 @@ internal class LlamaCppEngine : LlmEngine {
 
         val activeHandle = handle
         handle = 0L
+        loadedModelName = ""
         val nativeResult = safeNative("Unload model") {
-            withContext(Dispatchers.IO) {
+            withContext(nativeDispatcher) {
                 runWithTimeout(UNLOAD_TIMEOUT_MS, "Unload model") {
                     NativeLlamaBridge.unloadModel(activeHandle)
                 }
@@ -97,7 +102,7 @@ internal class LlamaCppEngine : LlmEngine {
             return failure("Model must be loaded before tokenization.")
         }
         return try {
-            val nativeResult = NativeLlamaBridge.tokenize(handle, prompt)
+            val nativeResult = NativeLlamaBridge.tokenize(handle, formatPrompt(prompt))
             if (!nativeResult.first) {
                 failure(nativeResult.second)
             } else {
@@ -119,7 +124,7 @@ internal class LlamaCppEngine : LlmEngine {
 
         val activeHandle = handle
         val nativeResult = safeNative("Generate") {
-            withContext(Dispatchers.IO) {
+            withContext(nativeDispatcher) {
                 val timeoutMs = generationTimeoutMs(config.maxOutputTokens)
                 runWithTimeout(
                     timeoutMs = timeoutMs,
@@ -131,7 +136,7 @@ internal class LlamaCppEngine : LlmEngine {
                     var firstTokenSent = false
                     NativeLlamaBridge.generate(
                         handle = activeHandle,
-                        prompt = prompt,
+                        prompt = formatPrompt(prompt),
                         maxOutputTokens = config.maxOutputTokens,
                         temperature = config.temperature.toFloat(),
                         topK = config.topK,
@@ -152,6 +157,9 @@ internal class LlamaCppEngine : LlmEngine {
             return failure(nativeResult.second)
         }
         val generation = nativeResult.third ?: return failure("Native generation completed without a result.")
+        if (generation.outputTokens <= 0 || generation.outputText.isBlank()) {
+            return failure("Native generation produced no text. The model returned an end-of-generation token before content; check the prompt/chat template, context size, and model compatibility.")
+        }
 
         return success(
             GenerationResult(
@@ -193,7 +201,7 @@ internal class LlamaCppEngine : LlmEngine {
         graceTimeoutMs: Long = 0L,
         block: () -> Triple<Boolean, String, T?>,
     ): Triple<Boolean, String, T?> {
-        val executor = Executors.newSingleThreadExecutor()
+        val executor = Executors.newSingleThreadExecutor(NativeThreadFactory)
         val future = executor.submit(Callable { block() })
         return try {
             future.get(timeoutMs, TimeUnit.MILLISECONDS)
@@ -221,6 +229,17 @@ internal class LlamaCppEngine : LlmEngine {
         return (60_000L + maxOutputTokens.coerceAtLeast(1) * 10_000L).coerceAtMost(GENERATE_TIMEOUT_MAX_MS)
     }
 
+    private fun formatPrompt(prompt: String): String {
+        val trimmed = prompt.trim()
+        if (trimmed.contains("<|im_start|>")) return prompt
+        val modelName = loadedModelName.lowercase()
+        return if (modelName.contains("qwen") || modelName.contains("smollm")) {
+            "<|im_start|>user\n$trimmed<|im_end|>\n<|im_start|>assistant\n"
+        } else {
+            prompt
+        }
+    }
+
     private fun <T> success(value: T): Triple<Boolean, String, T?> = Triple(true, "", value)
 
     private fun <T> failure(message: String): Triple<Boolean, String, T?> = Triple(false, message, null)
@@ -230,5 +249,13 @@ internal class LlamaCppEngine : LlmEngine {
         const val UNLOAD_TIMEOUT_MS = 30_000L
         const val ABORT_GRACE_TIMEOUT_MS = 15_000L
         const val GENERATE_TIMEOUT_MAX_MS = 15 * 60_000L
+    }
+
+    private object NativeThreadFactory : ThreadFactory {
+        override fun newThread(runnable: Runnable): Thread {
+            return Thread(runnable, "llama-native-worker").apply {
+                isDaemon = true
+            }
+        }
     }
 }
