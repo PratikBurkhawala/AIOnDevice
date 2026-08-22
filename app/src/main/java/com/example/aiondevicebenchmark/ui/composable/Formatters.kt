@@ -13,6 +13,11 @@ private val localDateTimeFormatter: DateTimeFormatter = DateTimeFormatter
 
 fun formatDouble(value: Double): String = "%.2f".format(Locale.getDefault(), value)
 
+fun formatDouble(value: Double?): String {
+    if (value == null) return ""
+    return "%.2f".format(Locale.getDefault(), value)
+}
+
 fun formatDate(value: Long): String {
     return localDateTimeFormatter.format(Date(value).toInstant())
 }

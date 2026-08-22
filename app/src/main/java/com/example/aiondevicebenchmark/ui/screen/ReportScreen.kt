@@ -71,8 +71,7 @@ private fun ReportTable(files: List<SavedJsonFile>) {
             ),
             header = true,
         )
-        files.forEach { file ->
-            val record = file.record
+        files.flatMap { it.records }.forEach { record ->
             ReportRow(
                 values = listOf(
                     record.model.name,

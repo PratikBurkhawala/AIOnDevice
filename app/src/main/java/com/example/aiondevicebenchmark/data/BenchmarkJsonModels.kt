@@ -25,6 +25,14 @@ data class BenchmarkRecord(
 )
 
 @Serializable
+data class BenchmarkRunJson(
+    val runGroupId: String,
+    val startedAt: String,
+    val endedAt: String,
+    val results: List<BenchmarkRecord>,
+)
+
+@Serializable
 data class RunJson(
     val runId: String,
     val runGroupId: String,
@@ -80,8 +88,8 @@ data class RuntimeJson(
     val engine: String,
     val version: String,
     val backend: String,
-    val threads: Int,
-    val gpuLayers: Int,
+    val threads: Int?,
+    val gpuLayers: Int?,
 )
 
 @Serializable
@@ -137,7 +145,7 @@ data class GenerationConfigJson(
 @Serializable
 data class PromptJson(
     val promptId: String,
-    val inputTokenCount: Int,
+    val inputTokenCount: Int?,
     val outputTokenTarget: Int,
 )
 
@@ -145,7 +153,7 @@ data class PromptJson(
 data class ModelLoadingJson(
     val loadStart: String,
     val loadEnd: String,
-    val loadTimeMs: Long,
+    val loadTimeMs: Long?,
     val ramBeforeLoadMb: Int?,
     val ramAfterLoadMb: Int?,
 )
@@ -155,7 +163,7 @@ data class InferenceJson(
     val generationStart: String,
     val firstTokenTime: String?,
     val generatedText: String = "",
-    val ttftMs: Long,
+    val ttftMs: Long?,
     val prefill: PrefillJson,
     val decode: DecodeJson,
     val total: TotalInferenceJson,
@@ -193,15 +201,15 @@ data class InferenceJson(
 }
 
 @Serializable
-data class PrefillJson(val durationMs: Long, val tokens: Int, val tokensPerSecond: Double)
+data class PrefillJson(val durationMs: Long?, val tokens: Int?, val tokensPerSecond: Double?)
 
 @Serializable
-data class DecodeJson(val durationMs: Long, val tokens: Int, val tokensPerSecond: Double)
+data class DecodeJson(val durationMs: Long?, val tokens: Int?, val tokensPerSecond: Double?)
 
 @Serializable
 data class TotalInferenceJson(
-    val durationMs: Long,
-    val outputTokens: Int,
+    val durationMs: Long?,
+    val outputTokens: Int?,
     val generationEnd: String,
 )
 
@@ -270,7 +278,7 @@ data class ProfilingJson(val tool: String?, val evidence: String?)
 data class ModelUnloadingJson(
     val unloadStart: String,
     val unloadEnd: String,
-    val unloadTimeMs: Long,
+    val unloadTimeMs: Long?,
 )
 
 @Serializable

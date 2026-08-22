@@ -104,22 +104,40 @@ class BenchmarkViewModel(
             }
             is BenchmarkUiEvent.UpdateCondition -> update { it.copy(condition = event.value) }
             is BenchmarkUiEvent.UpdatePrompt -> update { it.copy(prompt = event.value) }
-            is BenchmarkUiEvent.UpdateMaxOutputTokens -> updateGenerationInt(event.value) { current, intValue ->
+            is BenchmarkUiEvent.UpdateMaxOutputTokens -> updateGenerationInt(
+                value = event.value,
+                inputSetter = { it.copy(maxOutputTokensInput = event.value) },
+            ) { current, intValue ->
                 current.copy(maxOutputTokens = intValue.coerceIn(1, 512))
             }
-            is BenchmarkUiEvent.UpdateConsecutiveGenerations -> update {
-                it.copy(consecutiveGenerations = event.value.toIntOrNull()?.coerceIn(1, 20) ?: it.consecutiveGenerations)
+            is BenchmarkUiEvent.UpdateConsecutiveGenerations -> {
+                _uiState.update { it.copy(generationsInput = event.value) }
+                update {
+                    it.copy(consecutiveGenerations = event.value.toIntOrNull()?.coerceIn(1, 20) ?: it.consecutiveGenerations)
+                }
             }
-            is BenchmarkUiEvent.UpdateTemperature -> updateGenerationDouble(event.value) { current, doubleValue ->
+            is BenchmarkUiEvent.UpdateTemperature -> updateGenerationDouble(
+                value = event.value,
+                inputSetter = { it.copy(temperatureInput = event.value) },
+            ) { current, doubleValue ->
                 current.copy(temperature = doubleValue.coerceIn(0.0, 2.0))
             }
-            is BenchmarkUiEvent.UpdateTopK -> updateGenerationInt(event.value) { current, intValue ->
+            is BenchmarkUiEvent.UpdateTopK -> updateGenerationInt(
+                value = event.value,
+                inputSetter = { it.copy(topKInput = event.value) },
+            ) { current, intValue ->
                 current.copy(topK = intValue.coerceIn(1, 200))
             }
-            is BenchmarkUiEvent.UpdateTopP -> updateGenerationDouble(event.value) { current, doubleValue ->
+            is BenchmarkUiEvent.UpdateTopP -> updateGenerationDouble(
+                value = event.value,
+                inputSetter = { it.copy(topPInput = event.value) },
+            ) { current, doubleValue ->
                 current.copy(topP = doubleValue.coerceIn(0.0, 1.0))
             }
-            is BenchmarkUiEvent.UpdateSeed -> updateGenerationInt(event.value) { current, intValue ->
+            is BenchmarkUiEvent.UpdateSeed -> updateGenerationInt(
+                value = event.value,
+                inputSetter = { it.copy(seedInput = event.value) },
+            ) { current, intValue ->
                 current.copy(seed = intValue)
             }
         }
@@ -258,12 +276,22 @@ class BenchmarkViewModel(
         return localizeModelUseCase(detectModelQuantizationUseCase(model))
     }
 
-    private fun updateGenerationInt(value: String, block: (GenerationConfig, Int) -> GenerationConfig) {
+    private fun updateGenerationInt(
+        value: String,
+        inputSetter: (BenchmarkUiState) -> BenchmarkUiState,
+        block: (GenerationConfig, Int) -> GenerationConfig,
+    ) {
+        _uiState.update(inputSetter)
         val parsed = value.toIntOrNull() ?: return
         update { it.copy(generation = block(it.generation, parsed)) }
     }
 
-    private fun updateGenerationDouble(value: String, block: (GenerationConfig, Double) -> GenerationConfig) {
+    private fun updateGenerationDouble(
+        value: String,
+        inputSetter: (BenchmarkUiState) -> BenchmarkUiState,
+        block: (GenerationConfig, Double) -> GenerationConfig,
+    ) {
+        _uiState.update(inputSetter)
         val parsed = value.toDoubleOrNull() ?: return
         update { it.copy(generation = block(it.generation, parsed)) }
     }

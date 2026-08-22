@@ -1,6 +1,7 @@
 package com.example.aiondevicebenchmark.benchmark
 
 import com.example.aiondevicebenchmark.data.BenchmarkRecord
+import com.example.aiondevicebenchmark.background.BackgroundWorkTracker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,6 +12,7 @@ import kotlinx.coroutines.launch
 class BenchmarkController(
     private val runner: BenchmarkRunner,
     private val scope: CoroutineScope,
+    private val backgroundWorkTracker: BackgroundWorkTracker,
 ) {
     private val _state = MutableStateFlow<BenchmarkState>(BenchmarkState.Idle)
     val state: StateFlow<BenchmarkState> = _state.asStateFlow()
@@ -22,7 +24,9 @@ class BenchmarkController(
             return
         }
         activeJob = scope.launch {
-            runBenchmark(config)
+            backgroundWorkTracker.begin("Benchmark is running").use {
+                runBenchmark(config)
+            }
         }
     }
 

@@ -1,5 +1,6 @@
 package com.example.aiondevicebenchmark.di
 
+import com.example.aiondevicebenchmark.background.BackgroundWorkTracker
 import com.example.aiondevicebenchmark.benchmark.BenchmarkController
 import com.example.aiondevicebenchmark.benchmark.BenchmarkRunner
 import com.example.aiondevicebenchmark.data.JsonRepository
@@ -41,12 +42,13 @@ val engineModule = module {
 
 val appModule = module {
     single { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
+    single { BackgroundWorkTracker(androidContext()) }
     single { TelemetryCollector(androidContext()) }
     single<BenchmarkResultRepository> { JsonRepository(androidContext()) }
-    single<ModelDownloadRepository> { ModelDownloadRepositoryImpl(androidContext(), get()) }
+    single<ModelDownloadRepository> { ModelDownloadRepositoryImpl(androidContext(), get(), get()) }
 
     factory { BenchmarkRunner(engineFactory = get(), telemetryCollector = get(), resultRepository = get()) }
-    single { BenchmarkController(runner = get(), scope = get()) }
+    single { BenchmarkController(runner = get(), scope = get(), backgroundWorkTracker = get()) }
 
     factory { StartBenchmarkUseCase(controller = get()) }
     factory { ListSavedJsonFilesUseCase(repository = get()) }

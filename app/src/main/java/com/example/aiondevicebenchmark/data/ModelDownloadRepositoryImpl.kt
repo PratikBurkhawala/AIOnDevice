@@ -1,11 +1,13 @@
 package com.example.aiondevicebenchmark.data
 
 import android.content.Context
+import com.example.aiondevicebenchmark.background.BackgroundWorkTracker
 import com.example.aiondevicebenchmark.domain.model.ModelDownloadState
 import com.example.aiondevicebenchmark.domain.model.ModelDownloadStatus
 import com.example.aiondevicebenchmark.domain.repository.ModelDownloadRepository
 import com.example.aiondevicebenchmark.llm.EngineType
 import com.example.aiondevicebenchmark.llm.ModelConfig
+import java.io.Closeable
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -20,6 +22,7 @@ import kotlinx.coroutines.launch
 class ModelDownloadRepositoryImpl(
     context: Context,
     private val scope: CoroutineScope,
+    private val backgroundWorkTracker: BackgroundWorkTracker,
 ) : ModelDownloadRepository {
     private val rootModelDirectory = File(context.getExternalFilesDir(null), "models")
 
@@ -101,7 +104,9 @@ class ModelDownloadRepositoryImpl(
         setState(model, notDownloadedState(model).copy(status = ModelDownloadStatus.Downloading, message = "Starting download"))
 
         var connection: HttpURLConnection? = null
+        var backgroundWork: Closeable? = null
         try {
+            backgroundWork = backgroundWorkTracker.begin("Downloading ${model.name}")
             connection = (URL(model.downloadUrl).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 30_000
                 readTimeout = 30_000
@@ -142,6 +147,7 @@ class ModelDownloadRepositoryImpl(
             setFailed(model, "Download failed: ${error.message ?: error::class.java.simpleName}")
         } finally {
             connection?.disconnect()
+            backgroundWork?.close()
         }
     }
 

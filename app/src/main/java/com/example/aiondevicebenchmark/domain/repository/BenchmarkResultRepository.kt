@@ -8,6 +8,7 @@ import java.io.File
 interface BenchmarkResultRepository {
     val outputDirectory: File
     fun save(record: BenchmarkRecord): File
+    fun saveRun(runGroupId: String, records: List<BenchmarkRecord>): File
     fun listSavedFiles(): List<SavedJsonFile>
     fun findSavedFile(fileName: String): SavedJsonFile?
     fun delete(fileName: String): Boolean

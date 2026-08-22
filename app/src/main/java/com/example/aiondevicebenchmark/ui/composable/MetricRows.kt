@@ -85,7 +85,7 @@ fun keyValueRows(record: BenchmarkRecord): List<Pair<String, String>> {
         "Top-P" to record.generationConfig.topP.toString(),
         "Seed" to record.generationConfig.seed.toString(),
         "Prompt ID" to record.prompt.promptId,
-        "Input tokens" to record.prompt.inputTokenCount.toString(),
+        "Input tokens" to record.prompt.inputTokenCount?.toString().orEmpty(),
         "Output target" to record.prompt.outputTokenTarget.toString(),
         "Generated response" to record.inference.generatedText,
         "TTFT" to formatSeconds(record.inference.ttftMs),

@@ -39,7 +39,7 @@ fun BenchmarkScreen(
     onEvent: (BenchmarkUiEvent) -> Unit,
 ) {
     BenchmarkConfigScreen(
-        config = state.config,
+        state = state,
         supportedEngines = state.supportedEngines,
         supportedModels = state.supportedModels,
         enabled = state.benchmarkState !is BenchmarkState.Running,
@@ -60,12 +60,13 @@ fun BenchmarkScreen(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BenchmarkConfigScreen(
-    config: BenchmarkConfig,
+    state: BenchmarkUiState,
     supportedEngines: List<EngineType>,
     supportedModels: List<ModelConfig>,
     enabled: Boolean,
     onEvent: (BenchmarkUiEvent) -> Unit,
 ) {
+    val config = state.config
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SectionTitle("Configuration")
         EngineDropdown(config.engineType, supportedEngines, enabled) {
@@ -92,6 +93,7 @@ private fun BenchmarkConfigScreen(
             readOnly = true,
             label = { Text("Local GGUF path") },
         )
+        KeyValueRow("Acceleration", "CPU via llama.cpp. GPU/NPU acceleration is not enabled in this APK.")
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Condition", style = MaterialTheme.typography.labelLarge)
@@ -118,16 +120,16 @@ private fun BenchmarkConfigScreen(
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            NumericField("Max output", config.generation.maxOutputTokens.toString(), enabled, { onEvent(BenchmarkUiEvent.UpdateMaxOutputTokens(it)) }, Modifier.weight(1f))
-            NumericField("Generations", config.consecutiveGenerations.toString(), enabled, { onEvent(BenchmarkUiEvent.UpdateConsecutiveGenerations(it)) }, Modifier.weight(1f))
+            NumericField("Max output", state.maxOutputTokensInput, enabled, { onEvent(BenchmarkUiEvent.UpdateMaxOutputTokens(it)) }, Modifier.weight(1f))
+            NumericField("Generations", state.generationsInput, enabled, { onEvent(BenchmarkUiEvent.UpdateConsecutiveGenerations(it)) }, Modifier.weight(1f))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            NumericField("Temperature", config.generation.temperature.toString(), enabled, { onEvent(BenchmarkUiEvent.UpdateTemperature(it)) }, Modifier.weight(1f), KeyboardType.Decimal)
-            NumericField("Top-K", config.generation.topK.toString(), enabled, { onEvent(BenchmarkUiEvent.UpdateTopK(it)) }, Modifier.weight(1f))
+            NumericField("Temperature", state.temperatureInput, enabled, { onEvent(BenchmarkUiEvent.UpdateTemperature(it)) }, Modifier.weight(1f), KeyboardType.Decimal)
+            NumericField("Top-K", state.topKInput, enabled, { onEvent(BenchmarkUiEvent.UpdateTopK(it)) }, Modifier.weight(1f))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            NumericField("Top-P", config.generation.topP.toString(), enabled, { onEvent(BenchmarkUiEvent.UpdateTopP(it)) }, Modifier.weight(1f), KeyboardType.Decimal)
-            NumericField("Seed", config.generation.seed.toString(), enabled, { onEvent(BenchmarkUiEvent.UpdateSeed(it)) }, Modifier.weight(1f))
+            NumericField("Top-P", state.topPInput, enabled, { onEvent(BenchmarkUiEvent.UpdateTopP(it)) }, Modifier.weight(1f), KeyboardType.Decimal)
+            NumericField("Seed", state.seedInput, enabled, { onEvent(BenchmarkUiEvent.UpdateSeed(it)) }, Modifier.weight(1f))
         }
 
         Button(

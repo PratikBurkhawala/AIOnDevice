@@ -70,6 +70,12 @@ private fun MutableList<Pair<String, String>>.flattenJson(path: String, element:
 private fun String.child(key: String): String = if (isBlank()) key else "$this.$key"
 
 private fun displayLabel(path: String): String {
+    val resultPath = Regex("""results\[(\d+)]\.(.+)""").matchEntire(path)
+    if (resultPath != null) {
+        val index = resultPath.groupValues[1].toInt() + 1
+        val childPath = resultPath.groupValues[2]
+        return "Result $index - ${labelOverrides[childPath] ?: readablePath(childPath)}"
+    }
     return labelOverrides[path] ?: readablePath(path)
 }
 
@@ -114,6 +120,9 @@ private fun String.isPlaceholder(): Boolean {
 }
 
 private val labelOverrides = mapOf(
+    "runGroupId" to "Run Group",
+    "startedAt" to "Started At",
+    "endedAt" to "Ended At",
     "run.runId" to "Run ID",
     "run.runGroupId" to "Run Group",
     "run.timestamp.start" to "Start Time",

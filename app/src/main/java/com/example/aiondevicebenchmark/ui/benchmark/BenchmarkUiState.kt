@@ -22,4 +22,10 @@ data class BenchmarkUiState(
     val modelDownloads: Map<String, ModelDownloadState> = emptyMap(),
     val modelStorageDirectory: String = "",
     val message: String? = null,
+    val maxOutputTokensInput: String = config.generation.maxOutputTokens.toString(),
+    val generationsInput: String = config.consecutiveGenerations.toString(),
+    val temperatureInput: String = config.generation.temperature.toString(),
+    val topKInput: String = config.generation.topK.toString(),
+    val topPInput: String = config.generation.topP.toString(),
+    val seedInput: String = config.generation.seed.toString(),
 )

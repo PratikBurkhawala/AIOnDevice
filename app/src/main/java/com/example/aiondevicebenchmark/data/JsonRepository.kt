@@ -7,6 +7,8 @@ import com.example.aiondevicebenchmark.domain.repository.BenchmarkResultReposito
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import java.io.File
 import java.time.Instant
 import java.util.Locale
@@ -31,6 +33,24 @@ class JsonRepository(context: Context) : BenchmarkResultRepository {
         return file
     }
 
+    override fun saveRun(runGroupId: String, records: List<BenchmarkRecord>): File {
+        if (!outputDirectory.exists()) {
+            outputDirectory.mkdirs()
+        }
+        val startedAt = records.firstOrNull()?.run?.timestamp?.start ?: Instant.now().toString()
+        val endedAt = records.lastOrNull()?.run?.timestamp?.end ?: Instant.now().toString()
+        val runJson = BenchmarkRunJson(
+            runGroupId = runGroupId,
+            startedAt = startedAt,
+            endedAt = endedAt,
+            results = records,
+        )
+        val modelPart = records.firstOrNull()?.model?.name ?: "benchmark"
+        val file = nextAvailableFile("${runGroupId}_${modelPart}".safeFilePart(), extension = "json", directory = outputDirectory)
+        file.writeText(json.encodeToString(runJson))
+        return file
+    }
+
     override fun listSavedFiles(): List<SavedJsonFile> {
         if (!outputDirectory.exists()) return emptyList()
         return outputDirectory
@@ -40,13 +60,14 @@ class JsonRepository(context: Context) : BenchmarkResultRepository {
             .mapNotNull { file ->
                 runCatching {
                     val rawJson = file.readText()
+                    val records = decodeRecords(rawJson)
                     SavedJsonFile(
                         fileName = file.name,
                         absolutePath = file.absolutePath,
                         lastModifiedMs = file.lastModified(),
                         sizeBytes = file.length(),
                         rawJson = rawJson,
-                        record = json.decodeFromString(rawJson),
+                        records = records,
                     )
                 }.getOrNull()
             }
@@ -118,8 +139,8 @@ class JsonRepository(context: Context) : BenchmarkResultRepository {
                 record.model.name,
                 record.model.quantization,
                 record.runtime.engine,
-                record.inference.prefill.tokensPerSecond.toString(),
-                record.inference.decode.tokensPerSecond.toString(),
+                record.inference.prefill.tokensPerSecond?.toString().orEmpty(),
+                record.inference.decode.tokensPerSecond?.toString().orEmpty(),
                 formatSeconds(record.inference.ttftMs),
                 formatMemoryMb(record.memory.peakAppPssMb),
                 formatSeconds(record.modelLoading.loadTimeMs),
@@ -137,7 +158,17 @@ class JsonRepository(context: Context) : BenchmarkResultRepository {
         return "\"$escaped\""
     }
 
-    private fun formatSeconds(milliseconds: Long): String {
+    private fun decodeRecords(rawJson: String): List<BenchmarkRecord> {
+        val root = json.parseToJsonElement(rawJson).jsonObject
+        return if (root["results"] != null) {
+            json.decodeFromString<BenchmarkRunJson>(rawJson).results
+        } else {
+            listOf(json.decodeFromString<BenchmarkRecord>(rawJson))
+        }
+    }
+
+    private fun formatSeconds(milliseconds: Long?): String {
+        if (milliseconds == null) return ""
         return "%.3f s".format(Locale.getDefault(), milliseconds / 1000.0)
     }
 
@@ -152,5 +183,8 @@ data class SavedJsonFile(
     val lastModifiedMs: Long,
     val sizeBytes: Long,
     val rawJson: String,
-    val record: BenchmarkRecord,
-)
+    val records: List<BenchmarkRecord>,
+) {
+    val record: BenchmarkRecord
+        get() = records.last()
+}

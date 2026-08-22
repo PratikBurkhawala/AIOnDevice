@@ -13,7 +13,7 @@ class ShareReportCsvUseCase(
     private val appContext = context.applicationContext
 
     operator fun invoke(files: List<SavedJsonFile>): Boolean {
-        val uri = repository.saveReportCsv(files.map { it.record }) ?: return false
+        val uri = repository.saveReportCsv(files.flatMap { it.records }) ?: return false
         shareUris(listOf(uri), "Share benchmark CSV", mimeType = "text/csv")
         return true
     }
