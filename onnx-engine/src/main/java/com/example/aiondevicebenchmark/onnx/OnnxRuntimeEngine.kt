@@ -27,6 +27,7 @@ internal class OnnxRuntimeEngine : LlmEngine {
     private var env: OrtEnvironment? = null
     private var session: OrtSession? = null
     private var tokenizer: ByteLevelBpeTokenizer? = null
+    private var loadedModelName: String = ""
     private var engineInfo = EngineInfo(
         name = "ONNX Runtime",
         version = "native",
@@ -59,6 +60,7 @@ internal class OnnxRuntimeEngine : LlmEngine {
             env = localEnv
             session = localSession
             tokenizer = localTokenizer
+            loadedModelName = model.name
             engineInfo = engineInfo.copy(
                 backend = backend,
                 threads = Runtime.getRuntime().availableProcessors(),
@@ -80,6 +82,7 @@ internal class OnnxRuntimeEngine : LlmEngine {
             session?.close()
             session = null
             tokenizer = null
+            loadedModelName = ""
             success(UnloadResult(unloadTimeMs = elapsedMs(start)))
         } catch (error: Throwable) {
             failure("ONNX model unload failed: ${error.message ?: error::class.java.simpleName}")
@@ -87,7 +90,7 @@ internal class OnnxRuntimeEngine : LlmEngine {
     }
 
     override fun tokenize(prompt: String): Triple<Boolean, String, TokenizationResult?> {
-        return success(TokenizationResult(tokenCount = prompt.toTokenIds().size))
+        return success(TokenizationResult(tokenCount = formatPrompt(prompt).toTokenIds().size))
     }
 
     override suspend fun generate(
@@ -101,7 +104,8 @@ internal class OnnxRuntimeEngine : LlmEngine {
         return try {
             val totalStart = Instant.now()
             val activeTokenizer = tokenizer
-            val promptTokens = prompt.toTokenIds().takeLast(MAX_CONTEXT_TOKENS).toMutableList()
+                ?: return failure("ONNX generation requires tokenizer.json for text decode. Re-download the model so the tokenizer file is present.")
+            val promptTokens = formatPrompt(prompt).toTokenIds().takeLast(MAX_CONTEXT_TOKENS).toMutableList()
             if (promptTokens.isEmpty()) {
                 promptTokens += DEFAULT_BOS_TOKEN
             }
@@ -140,7 +144,10 @@ internal class OnnxRuntimeEngine : LlmEngine {
             cache.close()
             val decodeMs = elapsedMs(decodeStart)
             val totalMs = elapsedMs(totalStart)
-            val output = activeTokenizer?.decode(outputTokens).orEmpty()
+            val output = activeTokenizer.decode(outputTokens)
+            if (output.isBlank()) {
+                return failure("ONNX generation produced no decoded text. The model likely emitted only special/end tokens; check the tokenizer, chat template, and model compatibility.")
+            }
 
             success(
                 GenerationResult(
@@ -329,6 +336,17 @@ internal class OnnxRuntimeEngine : LlmEngine {
             method.invoke(this)
             true
         }.getOrDefault(false)
+    }
+
+    private fun formatPrompt(prompt: String): String {
+        val trimmed = prompt.trim()
+        if (trimmed.contains("<|im_start|>")) return prompt
+        val modelName = loadedModelName.lowercase()
+        return if (modelName.contains("qwen") || modelName.contains("smollm")) {
+            "<|im_start|>user\n$trimmed<|im_end|>\n<|im_start|>assistant\n"
+        } else {
+            prompt
+        }
     }
 
     private fun String.toTokenIds(): List<Long> {
