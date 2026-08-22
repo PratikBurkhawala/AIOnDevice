@@ -1,0 +1,44 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Android local configuration
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+
+# Kotlin / native build caches
+.kotlin/
+.cxx/
+**/.cxx/
+
+# Generated packages and binaries
+*.apk
+*.aab
+*.ap_
+*.aar
+
+# Signing keys and secrets
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+
+# Downloaded on-device model files
+*.gguf
+*.tflite
+*.bin
+models/
+benchmark-models/
+
+# Runtime/exported benchmark data
+benchmark-results/
+captures/
+
+# Local agent/session metadata
+.agents/
+.codex/
