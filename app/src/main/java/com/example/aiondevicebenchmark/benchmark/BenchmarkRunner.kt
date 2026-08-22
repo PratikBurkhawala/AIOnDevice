@@ -495,8 +495,8 @@ class BenchmarkRunner(
     private fun measurementIssues(measurementStatus: String, backend: String): List<String> {
         return when (measurementStatus) {
             "SIMULATED" -> listOf("llama.cpp native bindings are not connected; timing is produced by the placeholder adapter.")
-            "EXPERIMENTAL_TOKEN_ID_DECODE" -> buildList {
-                add("ONNX Runtime path is experimental: prompt tokenization uses pseudo token IDs and generated output is token IDs, not decoded model text.")
+            "EXPERIMENTAL_ONNX_DECODE_UNAVAILABLE" -> buildList {
+                add("ONNX Runtime path is experimental: decoded output text is unavailable for this run.")
                 if (backend.contains("NNAPI", ignoreCase = true)) {
                     add("ONNX Runtime NNAPI was requested, but this benchmark does not verify per-op NPU/DSP/GPU placement.")
                 }

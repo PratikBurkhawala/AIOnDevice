@@ -33,7 +33,7 @@ internal class OnnxRuntimeEngine : LlmEngine {
         backend = "ONNX Runtime CPU",
         threads = Runtime.getRuntime().availableProcessors(),
         gpuLayers = 0,
-        measurementStatus = "EXPERIMENTAL_TOKEN_ID_DECODE",
+        measurementStatus = "EXPERIMENTAL_ONNX_DECODE_UNAVAILABLE",
     )
 
     override suspend fun loadModel(model: ModelConfig): Triple<Boolean, String, LoadResult?> {
@@ -63,7 +63,7 @@ internal class OnnxRuntimeEngine : LlmEngine {
                 backend = backend,
                 threads = Runtime.getRuntime().availableProcessors(),
                 measurementStatus = if (localTokenizer == null) {
-                    "EXPERIMENTAL_TOKEN_ID_DECODE"
+                    "EXPERIMENTAL_ONNX_DECODE_UNAVAILABLE"
                 } else {
                     "EXPERIMENTAL_TOKENIZER_JSON"
                 },
@@ -140,8 +140,7 @@ internal class OnnxRuntimeEngine : LlmEngine {
             cache.close()
             val decodeMs = elapsedMs(decodeStart)
             val totalMs = elapsedMs(totalStart)
-            val output = activeTokenizer?.decode(outputTokens)
-                ?: outputTokens.joinToString(" ", prefix = "token_ids: ")
+            val output = activeTokenizer?.decode(outputTokens).orEmpty()
 
             success(
                 GenerationResult(
