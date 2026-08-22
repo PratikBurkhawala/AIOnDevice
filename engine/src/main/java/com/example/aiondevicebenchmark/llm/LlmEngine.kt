@@ -82,13 +82,4 @@ data class EngineInfo(
     val threads: Int,
     val gpuLayers: Int,
     val measurementStatus: String,
-    val modelInputs: List<EngineTensorInfo> = emptyList(),
-    val modelOutputs: List<EngineTensorInfo> = emptyList(),
-)
-
-data class EngineTensorInfo(
-    val name: String,
-    val kind: String,
-    val dataType: String,
-    val shape: List<String>,
 )

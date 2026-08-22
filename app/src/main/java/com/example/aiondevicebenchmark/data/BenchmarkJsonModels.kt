@@ -112,16 +112,6 @@ data class RuntimeJson(
     val threads: Int?,
     val gpuLayers: Int?,
     val measurementStatus: String = "",
-    val modelInputs: List<RuntimeTensorJson> = emptyList(),
-    val modelOutputs: List<RuntimeTensorJson> = emptyList(),
-)
-
-@Serializable
-data class RuntimeTensorJson(
-    val name: String,
-    val kind: String,
-    val dataType: String,
-    val shape: List<String>,
 )
 
 @Serializable

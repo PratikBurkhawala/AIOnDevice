@@ -23,7 +23,6 @@ import com.example.aiondevicebenchmark.data.RunJson
 import com.example.aiondevicebenchmark.data.RunRamJson
 import com.example.aiondevicebenchmark.data.RunSummaryJson
 import com.example.aiondevicebenchmark.data.RuntimeJson
-import com.example.aiondevicebenchmark.data.RuntimeTensorJson
 import com.example.aiondevicebenchmark.data.TimestampJson
 import com.example.aiondevicebenchmark.data.TimestampedBatterySnapshotJson
 import com.example.aiondevicebenchmark.data.TotalInferenceJson
@@ -78,8 +77,6 @@ class BenchmarkRunner(
             threads = null,
             gpuLayers = null,
             measurementStatus = "",
-            modelInputs = emptyList(),
-            modelOutputs = emptyList(),
         )
         var engine: LlmEngine? = null
         var promptInputTokenCount: Int? = null
@@ -396,8 +393,6 @@ class BenchmarkRunner(
                 threads = null,
                 gpuLayers = null,
                 measurementStatus = "",
-                modelInputs = emptyList(),
-                modelOutputs = emptyList(),
             ),
             model = ModelJson.from(config.model, config.generation.maxOutputTokens),
             generationConfig = GenerationConfigJson.from(config.generation),
@@ -524,22 +519,6 @@ class BenchmarkRunner(
             threads = threads,
             gpuLayers = gpuLayers,
             measurementStatus = measurementStatus,
-            modelInputs = modelInputs.map {
-                RuntimeTensorJson(
-                    name = it.name,
-                    kind = it.kind,
-                    dataType = it.dataType,
-                    shape = it.shape,
-                )
-            },
-            modelOutputs = modelOutputs.map {
-                RuntimeTensorJson(
-                    name = it.name,
-                    kind = it.kind,
-                    dataType = it.dataType,
-                    shape = it.shape,
-                )
-            },
         )
     }
 

@@ -7,7 +7,6 @@ import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import ai.onnxruntime.TensorInfo
 import com.example.aiondevicebenchmark.llm.EngineInfo
-import com.example.aiondevicebenchmark.llm.EngineTensorInfo
 import com.example.aiondevicebenchmark.llm.GenerationConfig
 import com.example.aiondevicebenchmark.llm.GenerationListener
 import com.example.aiondevicebenchmark.llm.GenerationResult
@@ -68,8 +67,6 @@ internal class OnnxRuntimeEngine : LlmEngine {
                 } else {
                     "EXPERIMENTAL_TOKENIZER_JSON"
                 },
-                modelInputs = localSession.inputInfo.toEngineTensorInfo(),
-                modelOutputs = localSession.outputInfo.toEngineTensorInfo(),
             )
             success(LoadResult(loadTimeMs = elapsedMs(start)))
         } catch (error: Throwable) {
@@ -234,20 +231,6 @@ internal class OnnxRuntimeEngine : LlmEngine {
             error("Cannot infer empty KV-cache shape for $name: ${tensorInfo.shape.joinToString(prefix = "[", postfix = "]")}")
         }
         return floatTensor(env, FloatArray(shape.elementCount()), shape)
-    }
-
-    private fun Map<String, NodeInfo>.toEngineTensorInfo(): List<EngineTensorInfo> {
-        return entries.map { (name, nodeInfo) ->
-            val tensorInfo = nodeInfo.info as? TensorInfo
-            EngineTensorInfo(
-                name = name,
-                kind = nodeInfo.info.javaClass.simpleName,
-                dataType = tensorInfo?.type?.name ?: nodeInfo.info.toString(),
-                shape = tensorInfo?.shape?.map { dim ->
-                    if (dim < 0) "dynamic($dim)" else dim.toString()
-                }.orEmpty(),
-            )
-        }
     }
 
     private fun longTensor(env: OrtEnvironment, values: List<Long>, shape: LongArray): OnnxTensor {
