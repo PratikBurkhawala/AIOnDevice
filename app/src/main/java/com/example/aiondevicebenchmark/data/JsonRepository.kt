@@ -9,6 +9,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.time.Instant
+import java.util.Locale
 
 class JsonRepository(context: Context) : BenchmarkResultRepository {
     private val appContext = context.applicationContext
@@ -119,9 +120,9 @@ class JsonRepository(context: Context) : BenchmarkResultRepository {
                 record.runtime.engine,
                 record.inference.prefill.tokensPerSecond.toString(),
                 record.inference.decode.tokensPerSecond.toString(),
-                "${record.inference.ttftMs} ms",
-                "${record.memory.peakAppPssMb ?: "NA"} MB",
-                "${record.modelLoading.loadTimeMs} ms",
+                formatSeconds(record.inference.ttftMs),
+                formatMemoryMb(record.memory.peakAppPssMb),
+                formatSeconds(record.modelLoading.loadTimeMs),
                 record.device.model,
                 record.run.condition.type,
             )
@@ -134,6 +135,14 @@ class JsonRepository(context: Context) : BenchmarkResultRepository {
     private fun String.csvEscape(): String {
         val escaped = replace("\"", "\"\"")
         return "\"$escaped\""
+    }
+
+    private fun formatSeconds(milliseconds: Long): String {
+        return "%.3f s".format(Locale.getDefault(), milliseconds / 1000.0)
+    }
+
+    private fun formatMemoryMb(megabytes: Int?): String {
+        return megabytes?.let { "$it MB" }.orEmpty()
     }
 }
 

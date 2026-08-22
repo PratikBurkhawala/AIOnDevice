@@ -18,6 +18,7 @@ import com.example.aiondevicebenchmark.data.SavedJsonFile
 import com.example.aiondevicebenchmark.ui.benchmark.BenchmarkUiEvent
 import com.example.aiondevicebenchmark.ui.composable.SectionTitle
 import com.example.aiondevicebenchmark.ui.composable.formatDate
+import com.example.aiondevicebenchmark.ui.composable.formatFileSizeGb
 
 @Composable
 fun SavedJsonListScreen(
@@ -55,6 +56,7 @@ private fun SavedJsonListItem(
     ) {
         Text(file.fileName, fontWeight = FontWeight.SemiBold)
         Text("Saved: ${formatDate(file.lastModifiedMs)}", style = MaterialTheme.typography.bodySmall)
+        Text("File size: ${formatFileSizeGb(file.sizeBytes)}", style = MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { onEvent(BenchmarkUiEvent.SelectJson(file.fileName)) }) {
                 Text("Open")

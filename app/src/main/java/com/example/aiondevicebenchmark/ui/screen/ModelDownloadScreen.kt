@@ -21,6 +21,7 @@ import com.example.aiondevicebenchmark.llm.ModelConfig
 import com.example.aiondevicebenchmark.ui.benchmark.BenchmarkUiEvent
 import com.example.aiondevicebenchmark.ui.composable.KeyValueRow
 import com.example.aiondevicebenchmark.ui.composable.SectionTitle
+import com.example.aiondevicebenchmark.ui.composable.formatFileSizeGb
 
 @Composable
 fun ModelDownloadScreen(
@@ -33,7 +34,7 @@ fun ModelDownloadScreen(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SectionTitle("Models")
         Text(
-            text = "Download a GGUF model before benchmarking. Qwen is the lighter default; SmolLM is larger and needs more memory.",
+            text = "Download a GGUF model before benchmarking. Qwen is lighter; SmolLM is larger and needs more memory.",
             style = MaterialTheme.typography.bodyMedium,
         )
         if (storageDirectory.isNotBlank()) {
@@ -76,7 +77,7 @@ private fun ModelDownloadItem(
         )
         Text(model.description, style = MaterialTheme.typography.bodySmall)
         KeyValueRow("Quantization", model.quantization)
-        KeyValueRow("Size", model.downloadSizeLabel.ifBlank { "Unknown" })
+        KeyValueRow("Size", model.downloadSizeLabel)
         KeyValueRow("Status", state?.message ?: "Not downloaded")
 
         if (isDownloading) {
@@ -114,11 +115,5 @@ private fun downloadProgressText(state: ModelDownloadState): String {
 }
 
 private fun formatBytes(bytes: Long): String {
-    val gb = bytes / 1_000_000_000.0
-    val mb = bytes / 1_000_000.0
-    return if (gb >= 1.0) {
-        "%.2f GB".format(gb)
-    } else {
-        "%.0f MB".format(mb)
-    }
+    return formatFileSizeGb(bytes)
 }

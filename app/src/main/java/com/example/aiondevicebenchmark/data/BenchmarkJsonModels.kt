@@ -247,9 +247,9 @@ data class HardwareJson(
         fun cpuOnly(backend: String): HardwareJson {
             return HardwareJson(
                 backend = backend,
-                cpu = HardwareUnitJson(used = true, utilizationPercent = null, measurementStatus = "NOT_MEASURED"),
-                gpu = HardwareUnitJson(used = false, utilizationPercent = null, measurementStatus = "NOT_AVAILABLE"),
-                npu = HardwareUnitJson(used = false, utilizationPercent = null, measurementStatus = "NOT_AVAILABLE"),
+                cpu = HardwareUnitJson(used = true, utilizationPercent = null, measurementStatus = ""),
+                gpu = HardwareUnitJson(used = false, utilizationPercent = null, measurementStatus = ""),
+                npu = HardwareUnitJson(used = false, utilizationPercent = null, measurementStatus = ""),
                 profiling = ProfilingJson(tool = null, evidence = null),
             )
         }

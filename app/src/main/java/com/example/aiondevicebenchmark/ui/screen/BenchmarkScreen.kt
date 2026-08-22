@@ -163,7 +163,7 @@ private fun BenchmarkResultScreen(records: List<BenchmarkRecord>, outputDirector
         Text(outputDirectory, style = MaterialTheme.typography.bodySmall)
         records.lastOrNull()?.let { last ->
             MainMetrics(record = last)
-            KeyValueRow("Generated response", last.inference.generatedText.ifBlank { "No response text captured." })
+            KeyValueRow("Generated response", last.inference.generatedText)
         }
     }
 }

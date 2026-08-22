@@ -22,6 +22,8 @@ import com.example.aiondevicebenchmark.data.SavedJsonFile
 import com.example.aiondevicebenchmark.ui.benchmark.BenchmarkUiEvent
 import com.example.aiondevicebenchmark.ui.composable.SectionTitle
 import com.example.aiondevicebenchmark.ui.composable.formatDouble
+import com.example.aiondevicebenchmark.ui.composable.formatMemoryMb
+import com.example.aiondevicebenchmark.ui.composable.formatSeconds
 
 @Composable
 fun ReportScreen(
@@ -78,9 +80,9 @@ private fun ReportTable(files: List<SavedJsonFile>) {
                     record.runtime.engine,
                     formatDouble(record.inference.prefill.tokensPerSecond),
                     formatDouble(record.inference.decode.tokensPerSecond),
-                    "${record.inference.ttftMs} ms",
-                    "${record.memory.peakAppPssMb ?: "NA"} MB",
-                    "${record.modelLoading.loadTimeMs} ms",
+                    formatSeconds(record.inference.ttftMs),
+                    formatMemoryMb(record.memory.peakAppPssMb),
+                    formatSeconds(record.modelLoading.loadTimeMs),
                     record.device.model,
                     record.run.condition.type,
                 ),

@@ -22,7 +22,7 @@ data class BenchmarkConfig(
         quantization = "Q4_K_M",
         downloadUrl = "https://huggingface.co/bartowski/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf",
         downloadSizeLabel = "0.40 GB",
-        description = "Smallest default. Good quality for first device tests and lower RAM phones.",
+        description = "Smallest option. Good quality for first device tests and lower RAM phones.",
     ),
     val condition: BenchmarkCondition = BenchmarkCondition.NORMAL_COLD,
     val promptId: String = "P001",

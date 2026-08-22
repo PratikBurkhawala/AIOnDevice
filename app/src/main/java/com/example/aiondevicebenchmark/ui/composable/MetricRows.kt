@@ -26,9 +26,9 @@ fun MainMetrics(record: BenchmarkRecord) {
         KeyValueRow("Runtime", "${record.runtime.engine} ${record.runtime.version}")
         KeyValueRow("Prefill tok/s", formatDouble(record.inference.prefill.tokensPerSecond))
         KeyValueRow("Decode tok/s", formatDouble(record.inference.decode.tokensPerSecond))
-        KeyValueRow("TTFT", "${record.inference.ttftMs} ms")
-        KeyValueRow("Peak RAM", "${record.memory.peakAppPssMb ?: "not available"} MB")
-        KeyValueRow("Load time", "${record.modelLoading.loadTimeMs} ms")
+        KeyValueRow("TTFT", formatSeconds(record.inference.ttftMs))
+        KeyValueRow("Peak RAM", formatMemoryMb(record.memory.peakAppPssMb))
+        KeyValueRow("Load time", formatSeconds(record.modelLoading.loadTimeMs))
     }
 }
 
@@ -67,8 +67,8 @@ fun keyValueRows(record: BenchmarkRecord): List<Pair<String, String>> {
     return listOf(
         "Run ID" to record.run.runId,
         "Run group" to record.run.runGroupId,
-        "Start" to record.run.timestamp.start,
-        "End" to record.run.timestamp.end,
+        "Start" to formatLocalTimestamp(record.run.timestamp.start),
+        "End" to formatLocalTimestamp(record.run.timestamp.end),
         "Condition" to record.run.condition.type,
         "Model" to record.model.name,
         "Quantization" to record.model.quantization,
@@ -78,7 +78,7 @@ fun keyValueRows(record: BenchmarkRecord): List<Pair<String, String>> {
         "Threads" to record.runtime.threads.toString(),
         "GGUF file" to record.model.fileName,
         "Local GGUF path" to record.model.filePath,
-        "File size bytes" to record.model.fileSizeBytes?.toString().orEmpty(),
+        "File size" to formatFileSizeGb(record.model.fileSizeBytes),
         "Context size" to record.model.contextSize.toString(),
         "Temperature" to record.generationConfig.temperature.toString(),
         "Top-K" to record.generationConfig.topK.toString(),
@@ -88,17 +88,17 @@ fun keyValueRows(record: BenchmarkRecord): List<Pair<String, String>> {
         "Input tokens" to record.prompt.inputTokenCount.toString(),
         "Output target" to record.prompt.outputTokenTarget.toString(),
         "Generated response" to record.inference.generatedText,
-        "TTFT ms" to record.inference.ttftMs.toString(),
+        "TTFT" to formatSeconds(record.inference.ttftMs),
         "Prefill tokens/sec" to formatDouble(record.inference.prefill.tokensPerSecond),
         "Decode tokens/sec" to formatDouble(record.inference.decode.tokensPerSecond),
-        "Total duration ms" to record.inference.total.durationMs.toString(),
-        "Peak app PSS MB" to record.memory.peakAppPssMb?.toString().orEmpty(),
+        "Total duration" to formatSeconds(record.inference.total.durationMs),
+        "Peak RAM" to formatMemoryMb(record.memory.peakAppPssMb),
         "Battery before" to record.battery.beforePercentage?.toString().orEmpty(),
         "Battery after" to record.battery.afterPercentage?.toString().orEmpty(),
         "Battery drain" to record.battery.drainPercentage?.toString().orEmpty(),
         "Thermal status" to record.battery.thermalStatus,
-        "Load time ms" to record.modelLoading.loadTimeMs.toString(),
-        "Unload time ms" to record.modelUnloading.unloadTimeMs.toString(),
+        "Load time" to formatSeconds(record.modelLoading.loadTimeMs),
+        "Unload time" to formatSeconds(record.modelUnloading.unloadTimeMs),
         "Status" to record.result.status,
         "Error" to record.result.error.orEmpty(),
         "Observation" to record.observation.summary,
