@@ -33,21 +33,12 @@ class JsonRepository(context: Context) : BenchmarkResultRepository {
         return file
     }
 
-    override fun saveRun(runGroupId: String, records: List<BenchmarkRecord>): File {
+    override fun saveRun(run: BenchmarkRunJson): File {
         if (!outputDirectory.exists()) {
             outputDirectory.mkdirs()
         }
-        val startedAt = records.firstOrNull()?.run?.timestamp?.start ?: Instant.now().toString()
-        val endedAt = records.lastOrNull()?.run?.timestamp?.end ?: Instant.now().toString()
-        val runJson = BenchmarkRunJson(
-            runGroupId = runGroupId,
-            startedAt = startedAt,
-            endedAt = endedAt,
-            results = records,
-        )
-        val modelPart = records.firstOrNull()?.model?.name ?: "benchmark"
-        val file = nextAvailableFile("${runGroupId}_${modelPart}".safeFilePart(), extension = "json", directory = outputDirectory)
-        file.writeText(json.encodeToString(runJson))
+        val file = nextAvailableFile("${run.runGroupId}_${run.model.name}".safeFilePart(), extension = "json", directory = outputDirectory)
+        file.writeText(json.encodeToString(run))
         return file
     }
 
@@ -123,26 +114,36 @@ class JsonRepository(context: Context) : BenchmarkResultRepository {
 
     private fun List<BenchmarkRecord>.toCsv(): String {
         val header = listOf(
+            "Run",
             "Model",
             "Quant",
             "Runtime",
+            "Backend",
+            "Measurement status",
+            "Hardware evidence",
             "Prefill tok/s",
             "Decode tok/s",
             "TTFT",
             "Peak RAM",
+            "Battery drain",
             "Load time",
             "Device Name",
             "Condition",
         )
         val rows = map { record ->
             listOf(
+                record.run.condition.consecutiveGenerationNumber.toString(),
                 record.model.name,
                 record.model.quantization,
                 record.runtime.engine,
+                record.runtime.backend,
+                record.runtime.measurementStatus,
+                record.hardware.profiling.evidence.orEmpty(),
                 record.inference.prefill.tokensPerSecond?.toString().orEmpty(),
                 record.inference.decode.tokensPerSecond?.toString().orEmpty(),
                 formatSeconds(record.inference.ttftMs),
                 formatMemoryMb(record.memory.peakAppPssMb),
+                record.battery.drainPercentage?.toString().orEmpty(),
                 formatSeconds(record.modelLoading.loadTimeMs),
                 record.device.model,
                 record.run.condition.type,
@@ -160,10 +161,61 @@ class JsonRepository(context: Context) : BenchmarkResultRepository {
 
     private fun decodeRecords(rawJson: String): List<BenchmarkRecord> {
         val root = json.parseToJsonElement(rawJson).jsonObject
-        return if (root["results"] != null) {
-            json.decodeFromString<BenchmarkRunJson>(rawJson).results
-        } else {
-            listOf(json.decodeFromString<BenchmarkRecord>(rawJson))
+        return when {
+            root["inferenceRuns"] != null -> json.decodeFromString<BenchmarkRunJson>(rawJson).toBenchmarkRecords()
+            root["results"] != null -> json.decodeFromString<LegacyBenchmarkRunJson>(rawJson).results
+            else -> listOf(json.decodeFromString<BenchmarkRecord>(rawJson))
+        }
+    }
+
+    private fun BenchmarkRunJson.toBenchmarkRecords(): List<BenchmarkRecord> {
+        val sharedBattery = BatteryJson(
+            beforePercentage = battery.beforeStart.percentage,
+            afterPercentage = battery.afterEnd.percentage,
+            drainPercentage = battery.drainPercentage,
+            temperatureBeforeC = battery.beforeStart.temperatureC,
+            temperatureAfterC = battery.afterEnd.temperatureC,
+            thermalStatus = battery.thermalStatus,
+        )
+        val sharedMemory = MemoryJson(
+            beforeGenerationMb = ram.afterModelLoadMb,
+            samples = ram.samples,
+            peakAppPssMb = ram.peakAppPssMb,
+            afterGenerationMb = null,
+            afterModelUnloadMb = ram.afterModelUnloadMb,
+        )
+        return inferenceRuns.map { inferenceRun ->
+            val condition = ConditionJson(
+                type = inferenceRun.condition.type,
+                batterySaver = battery.beforeStart.batterySaver,
+                charging = battery.beforeStart.charging,
+                screenOn = inferenceRun.condition.screenOn,
+                appState = inferenceRun.condition.appState,
+                memoryPressure = inferenceRun.condition.memoryPressure,
+                consecutiveGenerationNumber = inferenceRun.condition.consecutiveGenerationNumber,
+                totalConsecutiveGenerations = inferenceRun.condition.totalConsecutiveGenerations,
+            )
+            BenchmarkRecord(
+                run = RunJson(
+                    runId = inferenceRun.runId,
+                    runGroupId = runGroupId,
+                    timestamp = inferenceRun.timestamp,
+                    condition = condition,
+                ),
+                device = device,
+                runtime = runtime,
+                model = model,
+                generationConfig = generationConfig,
+                prompt = prompt,
+                modelLoading = modelLoading,
+                inference = inferenceRun.inference,
+                memory = sharedMemory,
+                battery = sharedBattery,
+                hardware = hardware,
+                modelUnloading = modelUnloading,
+                result = inferenceRun.result,
+                observation = observation,
+            )
         }
     }
 

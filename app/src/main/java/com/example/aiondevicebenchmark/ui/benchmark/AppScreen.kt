@@ -6,4 +6,5 @@ enum class AppScreen(val label: String) {
     JsonList("Saved JSON"),
     JsonDetail("JSON Detail"),
     Report("Report"),
+    Crashes("Crashes"),
 }

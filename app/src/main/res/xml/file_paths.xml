@@ -3,6 +3,9 @@
     <external-files-path
         name="benchmark_results"
         path="benchmark-results/" />
+    <external-files-path
+        name="crash_reports"
+        path="crash-reports/" />
     <cache-path
         name="reports"
         path="reports/" />

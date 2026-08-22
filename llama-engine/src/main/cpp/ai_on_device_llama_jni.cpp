@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "llama.h"
+#include "ggml-backend.h"
 
 #define LOG_TAG "AIOnDeviceLlama"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -32,6 +33,17 @@ struct LlamaSession {
 };
 
 static std::once_flag g_backend_once;
+
+struct GpuBackendInfo {
+    bool available = false;
+    std::string name;
+};
+
+struct LoadedSession {
+    LlamaSession * session = nullptr;
+    std::string backend;
+    int gpu_layers = 0;
+};
 
 static int64_t elapsed_ms(const Clock::time_point start, const Clock::time_point end) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -210,6 +222,70 @@ static bool has_handle(const jlong handle) {
     return handle != 0L;
 }
 
+static GpuBackendInfo find_gpu_backend() {
+    const size_t device_count = ggml_backend_dev_count();
+    for (size_t i = 0; i < device_count; ++i) {
+        ggml_backend_dev_t device = ggml_backend_dev_get(i);
+        if (!device) {
+            continue;
+        }
+
+        ggml_backend_dev_props props{};
+        ggml_backend_dev_get_props(device, &props);
+        if (props.type == GGML_BACKEND_DEVICE_TYPE_GPU || props.type == GGML_BACKEND_DEVICE_TYPE_IGPU) {
+            const char * name = props.description ? props.description : props.name;
+            return GpuBackendInfo{true, name ? name : "Vulkan GPU"};
+        }
+    }
+    return GpuBackendInfo{};
+}
+
+static LoadedSession try_load_session(
+    const std::string & model_path,
+    const uint32_t n_ctx,
+    const uint32_t n_batch,
+    const int threads,
+    const bool prefer_gpu
+) {
+    llama_model_params model_params = llama_model_default_params();
+    model_params.n_gpu_layers = prefer_gpu ? -1 : 0;
+
+    llama_model * model = llama_model_load_from_file(model_path.c_str(), model_params);
+    if (!model) {
+        return LoadedSession{};
+    }
+
+    auto * session = new LlamaSession();
+    session->model = model;
+    session->threads = threads;
+    session->gpu_layers = model_params.n_gpu_layers;
+
+    llama_context_params ctx_params = llama_context_default_params();
+    ctx_params.n_ctx = n_ctx;
+    ctx_params.n_batch = n_batch;
+    ctx_params.n_ubatch = n_batch;
+    ctx_params.n_threads = threads;
+    ctx_params.n_threads_batch = threads;
+    ctx_params.no_perf = false;
+    ctx_params.abort_callback = [](void * data) -> bool {
+        auto * abort_requested = static_cast<std::atomic_bool *>(data);
+        return abort_requested && abort_requested->load();
+    };
+    ctx_params.abort_callback_data = &session->abort_requested;
+
+    llama_context * ctx = llama_init_from_model(model, ctx_params);
+    if (!ctx) {
+        llama_model_free(model);
+        delete session;
+        return LoadedSession{};
+    }
+
+    session->ctx = ctx;
+    session->vocab = llama_model_get_vocab(model);
+    session->threads = llama_n_threads(ctx);
+    return LoadedSession{session, prefer_gpu ? "GPU" : "CPU", session->gpu_layers};
+}
+
 } // namespace
 
 extern "C" JNIEXPORT jobject JNICALL
@@ -238,57 +314,44 @@ Java_com_example_aiondevicebenchmark_llama_NativeLlamaBridge_loadModel(
 
         const auto load_start = Clock::now();
 
-        llama_model_params model_params = llama_model_default_params();
-        model_params.n_gpu_layers = 0;
-
-        llama_model * model = llama_model_load_from_file(model_path.c_str(), model_params);
-        if (!model) {
-            return make_failure(env, "llama.cpp failed to load model");
-        }
-
         const int prompt_capacity = std::max(1, context_size);
         const int prediction_capacity = std::max(1, max_output_tokens);
         const uint32_t n_ctx = static_cast<uint32_t>(std::max(prompt_capacity, prompt_capacity + prediction_capacity));
         const uint32_t n_batch = n_ctx;
         const int threads = std::max(1, static_cast<int>(std::thread::hardware_concurrency()));
 
-        auto * session = new LlamaSession();
-        session->model = model;
-        session->threads = threads;
-        session->gpu_layers = model_params.n_gpu_layers;
-
-        llama_context_params ctx_params = llama_context_default_params();
-        ctx_params.n_ctx = n_ctx;
-        ctx_params.n_batch = n_batch;
-        ctx_params.n_ubatch = n_batch;
-        ctx_params.n_threads = threads;
-        ctx_params.n_threads_batch = threads;
-        ctx_params.no_perf = false;
-        ctx_params.abort_callback = [](void * data) -> bool {
-            auto * abort_requested = static_cast<std::atomic_bool *>(data);
-            return abort_requested && abort_requested->load();
-        };
-        ctx_params.abort_callback_data = &session->abort_requested;
-
-        llama_context * ctx = llama_init_from_model(model, ctx_params);
-        if (!ctx) {
-            llama_model_free(model);
-            delete session;
-            return make_failure(env, "llama.cpp failed to create context");
+        const GpuBackendInfo gpu = find_gpu_backend();
+        LoadedSession loaded{};
+        std::string backend = "CPU";
+        if (gpu.available) {
+            LOGI("llama.cpp GPU backend available: %s", gpu.name.c_str());
+            loaded = try_load_session(model_path, n_ctx, n_batch, threads, true);
+            if (loaded.session) {
+                backend = "GPU: " + gpu.name;
+            } else {
+                LOGE("llama.cpp GPU load failed; falling back to CPU");
+            }
+        } else {
+            LOGI("llama.cpp GPU backend unavailable; using CPU");
         }
 
-        session->ctx = ctx;
-        session->vocab = llama_model_get_vocab(model);
-        session->threads = llama_n_threads(ctx);
+        if (!loaded.session) {
+            loaded = try_load_session(model_path, n_ctx, n_batch, threads, false);
+            backend = gpu.available ? "CPU (GPU fallback)" : "CPU";
+        }
+
+        if (!loaded.session) {
+            return make_failure(env, "llama.cpp failed to load model or create context");
+        }
 
         const auto load_end = Clock::now();
         jobject result = make_load_result(
             env,
-            reinterpret_cast<int64_t>(session),
+            reinterpret_cast<int64_t>(loaded.session),
             elapsed_ms(load_start, load_end),
-            "CPU",
-            session->threads,
-            session->gpu_layers,
+            backend,
+            loaded.session->threads,
+            loaded.gpu_layers,
             "native"
         );
         jobject triple = make_success(env, result);

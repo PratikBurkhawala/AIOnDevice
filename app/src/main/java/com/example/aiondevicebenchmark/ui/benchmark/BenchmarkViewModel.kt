@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.aiondevicebenchmark.benchmark.BenchmarkConfig
 import com.example.aiondevicebenchmark.benchmark.BenchmarkState
 import com.example.aiondevicebenchmark.domain.usecase.DeleteSavedJsonFileUseCase
+import com.example.aiondevicebenchmark.domain.usecase.DeleteCrashReportUseCase
 import com.example.aiondevicebenchmark.domain.usecase.DeleteModelUseCase
 import com.example.aiondevicebenchmark.domain.usecase.DetectModelQuantizationUseCase
 import com.example.aiondevicebenchmark.domain.usecase.FindSavedJsonFileUseCase
@@ -14,9 +15,12 @@ import com.example.aiondevicebenchmark.domain.usecase.GetModelsForEngineUseCase
 import com.example.aiondevicebenchmark.domain.usecase.GetSupportedEnginesUseCase
 import com.example.aiondevicebenchmark.domain.usecase.LocalizeModelUseCase
 import com.example.aiondevicebenchmark.domain.usecase.ListSavedJsonFilesUseCase
+import com.example.aiondevicebenchmark.domain.usecase.ListCrashReportsUseCase
 import com.example.aiondevicebenchmark.domain.usecase.ObserveModelDownloadsUseCase
 import com.example.aiondevicebenchmark.domain.usecase.RefreshModelDownloadsUseCase
 import com.example.aiondevicebenchmark.domain.usecase.ShareReportCsvUseCase
+import com.example.aiondevicebenchmark.domain.usecase.ShareCrashReportUseCase
+import com.example.aiondevicebenchmark.domain.usecase.ShareJsonFileUseCase
 import com.example.aiondevicebenchmark.domain.usecase.StartModelDownloadUseCase
 import com.example.aiondevicebenchmark.domain.usecase.StartBenchmarkUseCase
 import com.example.aiondevicebenchmark.llm.GenerationConfig
@@ -34,7 +38,11 @@ class BenchmarkViewModel(
     private val listSavedJsonFilesUseCase: ListSavedJsonFilesUseCase,
     private val findSavedJsonFileUseCase: FindSavedJsonFileUseCase,
     private val deleteSavedJsonFileUseCase: DeleteSavedJsonFileUseCase,
+    private val listCrashReportsUseCase: ListCrashReportsUseCase,
+    private val deleteCrashReportUseCase: DeleteCrashReportUseCase,
     private val shareReportCsvUseCase: ShareReportCsvUseCase,
+    private val shareJsonFileUseCase: ShareJsonFileUseCase,
+    private val shareCrashReportUseCase: ShareCrashReportUseCase,
     private val getSupportedEnginesUseCase: GetSupportedEnginesUseCase,
     private val getModelsForEngineUseCase: GetModelsForEngineUseCase,
     private val getDefaultModelForEngineUseCase: GetDefaultModelForEngineUseCase,
@@ -58,6 +66,7 @@ class BenchmarkViewModel(
     init {
         refreshModelDownloadsUseCase(_uiState.value.supportedModels)
         refreshSavedFiles()
+        refreshCrashReports()
         viewModelScope.launch {
             startBenchmarkUseCase.state.collect { benchmarkState ->
                 _uiState.update { it.copy(benchmarkState = benchmarkState) }
@@ -86,6 +95,9 @@ class BenchmarkViewModel(
             is BenchmarkUiEvent.SelectJson -> selectJson(event.fileName)
             BenchmarkUiEvent.RefreshSavedFiles -> refreshSavedFiles()
             is BenchmarkUiEvent.DeleteJson -> deleteJson(event.fileName)
+            is BenchmarkUiEvent.ShareJson -> shareJson(event.absolutePath)
+            is BenchmarkUiEvent.DeleteCrashReport -> deleteCrashReport(event.fileName)
+            is BenchmarkUiEvent.ShareCrashReport -> shareCrashReport(event.absolutePath)
             BenchmarkUiEvent.ShareReportCsv -> shareReportCsv()
             BenchmarkUiEvent.StartBenchmark -> startBenchmark()
             is BenchmarkUiEvent.DownloadModel -> downloadModel(event.model)
@@ -114,6 +126,12 @@ class BenchmarkViewModel(
                 _uiState.update { it.copy(generationsInput = event.value) }
                 update {
                     it.copy(consecutiveGenerations = event.value.toIntOrNull()?.coerceIn(1, 20) ?: it.consecutiveGenerations)
+                }
+            }
+            is BenchmarkUiEvent.UpdateRamSamplingInterval -> {
+                _uiState.update { it.copy(ramSamplingIntervalInput = event.value) }
+                update {
+                    it.copy(ramSamplingIntervalSeconds = event.value.toIntOrNull()?.coerceIn(1, 3600) ?: it.ramSamplingIntervalSeconds)
                 }
             }
             is BenchmarkUiEvent.UpdateTemperature -> updateGenerationDouble(
@@ -148,6 +166,7 @@ class BenchmarkViewModel(
         when (screen) {
             AppScreen.JsonList -> refreshSavedFiles()
             AppScreen.Report -> loadReportFiles()
+            AppScreen.Crashes -> refreshCrashReports()
             AppScreen.Models -> refreshModelDownloadsUseCase(_uiState.value.supportedModels)
             else -> Unit
         }
@@ -234,10 +253,25 @@ class BenchmarkViewModel(
     private fun loadReportFiles() {
         _uiState.update { it.copy(reportLoading = true) }
         viewModelScope.launch {
-            val files = withContext(Dispatchers.IO) {
-                listSavedJsonFilesUseCase()
+            val filesAndCrashes = withContext(Dispatchers.IO) {
+                listSavedJsonFilesUseCase() to listCrashReportsUseCase()
             }
-            _uiState.update { it.copy(reportFiles = files, reportLoading = false) }
+            _uiState.update {
+                it.copy(
+                    reportFiles = filesAndCrashes.first,
+                    crashReports = filesAndCrashes.second,
+                    reportLoading = false,
+                )
+            }
+        }
+    }
+
+    private fun refreshCrashReports() {
+        viewModelScope.launch {
+            val crashes = withContext(Dispatchers.IO) {
+                listCrashReportsUseCase()
+            }
+            _uiState.update { it.copy(crashReports = crashes) }
         }
     }
 
@@ -251,6 +285,25 @@ class BenchmarkViewModel(
             }
         }
         refreshSavedFiles()
+    }
+
+    private fun deleteCrashReport(fileName: String) {
+        deleteCrashReportUseCase(fileName)
+        refreshCrashReports()
+    }
+
+    private fun shareJson(absolutePath: String) {
+        val shared = shareJsonFileUseCase(absolutePath)
+        if (!shared) {
+            _uiState.update { it.copy(message = "JSON file is not available to share.") }
+        }
+    }
+
+    private fun shareCrashReport(absolutePath: String) {
+        val shared = shareCrashReportUseCase(absolutePath)
+        if (!shared) {
+            _uiState.update { it.copy(message = "Crash report is not available to share.") }
+        }
     }
 
     private fun shareReportCsv() {

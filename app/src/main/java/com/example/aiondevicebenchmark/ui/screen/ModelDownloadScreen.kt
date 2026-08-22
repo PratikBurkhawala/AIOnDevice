@@ -34,7 +34,7 @@ fun ModelDownloadScreen(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SectionTitle("Models")
         Text(
-            text = "Download a GGUF model before benchmarking. Qwen is lighter; SmolLM is larger and needs more memory.",
+            text = "Download a model for the selected engine before benchmarking. Smaller models are better for first device tests.",
             style = MaterialTheme.typography.bodyMedium,
         )
         if (storageDirectory.isNotBlank()) {

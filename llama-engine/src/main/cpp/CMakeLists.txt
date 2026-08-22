@@ -14,6 +14,7 @@ find_library(log-lib log)
 
 target_include_directories(ai_on_device_llama_jni PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/ggml/include
 )
 
 target_link_libraries(ai_on_device_llama_jni

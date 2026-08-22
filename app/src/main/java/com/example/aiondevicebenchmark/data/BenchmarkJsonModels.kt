@@ -29,6 +29,27 @@ data class BenchmarkRunJson(
     val runGroupId: String,
     val startedAt: String,
     val endedAt: String,
+    val device: DeviceJson,
+    val runtime: RuntimeJson,
+    val model: ModelJson,
+    val generationConfig: GenerationConfigJson,
+    val prompt: PromptJson,
+    val battery: RunBatteryJson,
+    val ram: RunRamJson,
+    val modelLoading: ModelLoadingJson,
+    val inferenceRuns: List<InferenceRunJson>,
+    val hardware: HardwareJson,
+    val modelUnloading: ModelUnloadingJson,
+    val summary: RunSummaryJson,
+    val result: ResultJson,
+    val observation: ObservationJson,
+)
+
+@Serializable
+data class LegacyBenchmarkRunJson(
+    val runGroupId: String,
+    val startedAt: String,
+    val endedAt: String,
     val results: List<BenchmarkRecord>,
 )
 
@@ -90,6 +111,17 @@ data class RuntimeJson(
     val backend: String,
     val threads: Int?,
     val gpuLayers: Int?,
+    val measurementStatus: String = "",
+    val modelInputs: List<RuntimeTensorJson> = emptyList(),
+    val modelOutputs: List<RuntimeTensorJson> = emptyList(),
+)
+
+@Serializable
+data class RuntimeTensorJson(
+    val name: String,
+    val kind: String,
+    val dataType: String,
+    val shape: List<String>,
 )
 
 @Serializable
@@ -99,6 +131,8 @@ data class ModelJson(
     val format: String,
     val fileName: String,
     val filePath: String = "",
+    val tokenizerFileName: String = "",
+    val tokenizerFilePath: String = "",
     val quantization: String,
     val fileSizeBytes: Long?,
     val contextSize: Int,
@@ -114,6 +148,8 @@ data class ModelJson(
                 format = model.format,
                 fileName = model.fileName,
                 filePath = model.filePath,
+                tokenizerFileName = model.tokenizerFileName,
+                tokenizerFilePath = model.tokenizerFilePath,
                 quantization = model.quantization,
                 fileSizeBytes = fileSize,
                 contextSize = model.contextSize,
@@ -154,8 +190,6 @@ data class ModelLoadingJson(
     val loadStart: String,
     val loadEnd: String,
     val loadTimeMs: Long?,
-    val ramBeforeLoadMb: Int?,
-    val ramAfterLoadMb: Int?,
 )
 
 @Serializable
@@ -223,7 +257,11 @@ data class MemoryJson(
 )
 
 @Serializable
-data class MemorySampleJson(val timestamp: String, val appPssMb: Int?)
+data class MemorySampleJson(
+    val timestamp: String,
+    val phase: String = "",
+    val appPssMb: Int?,
+)
 
 @Serializable
 data class BatterySnapshotJson(
@@ -231,6 +269,35 @@ data class BatterySnapshotJson(
     val temperatureC: Double?,
     val charging: Boolean,
     val batterySaver: Boolean,
+)
+
+@Serializable
+data class TimestampedBatterySnapshotJson(
+    val timestamp: String,
+    val percentage: Int?,
+    val temperatureC: Double?,
+    val charging: Boolean,
+    val batterySaver: Boolean,
+) {
+    companion object {
+        fun from(timestamp: String, snapshot: BatterySnapshotJson): TimestampedBatterySnapshotJson {
+            return TimestampedBatterySnapshotJson(
+                timestamp = timestamp,
+                percentage = snapshot.percentage,
+                temperatureC = snapshot.temperatureC,
+                charging = snapshot.charging,
+                batterySaver = snapshot.batterySaver,
+            )
+        }
+    }
+}
+
+@Serializable
+data class RunBatteryJson(
+    val beforeStart: TimestampedBatterySnapshotJson,
+    val afterEnd: TimestampedBatterySnapshotJson,
+    val drainPercentage: Int?,
+    val thermalStatus: String,
 )
 
 @Serializable
@@ -244,6 +311,61 @@ data class BatteryJson(
 )
 
 @Serializable
+data class RunRamJson(
+    val samplingIntervalMs: Long,
+    val beforeModelLoadMb: Int?,
+    val afterModelLoadMb: Int?,
+    val afterModelUnloadMb: Int?,
+    val peakAppPssMb: Int?,
+    val samples: List<MemorySampleJson>,
+)
+
+@Serializable
+data class InferenceRunJson(
+    val runId: String,
+    val index: Int,
+    val timestamp: TimestampJson,
+    val condition: InferenceConditionJson,
+    val inference: InferenceJson,
+    val result: ResultJson,
+)
+
+@Serializable
+data class InferenceConditionJson(
+    val type: String,
+    val screenOn: Boolean,
+    val appState: String,
+    val memoryPressure: String,
+    val consecutiveGenerationNumber: Int,
+    val totalConsecutiveGenerations: Int,
+) {
+    companion object {
+        fun from(condition: ConditionJson): InferenceConditionJson {
+            return InferenceConditionJson(
+                type = condition.type,
+                screenOn = condition.screenOn,
+                appState = condition.appState,
+                memoryPressure = condition.memoryPressure,
+                consecutiveGenerationNumber = condition.consecutiveGenerationNumber,
+                totalConsecutiveGenerations = condition.totalConsecutiveGenerations,
+            )
+        }
+    }
+}
+
+@Serializable
+data class RunSummaryJson(
+    val totalInferenceRuns: Int,
+    val successfulRuns: Int,
+    val failedRuns: Int,
+    val averageTtftMs: Double?,
+    val averagePrefillTokensPerSecond: Double?,
+    val averageDecodeTokensPerSecond: Double?,
+    val peakAppPssMb: Int?,
+    val batteryDrainPercentage: Int?,
+)
+
+@Serializable
 data class HardwareJson(
     val backend: String,
     val cpu: HardwareUnitJson,
@@ -252,13 +374,37 @@ data class HardwareJson(
     val profiling: ProfilingJson,
 ) {
     companion object {
-        fun cpuOnly(backend: String): HardwareJson {
+        fun fromBackend(backend: String, measurementStatus: String = ""): HardwareJson {
+            val usesGpu = backend.contains("GPU", ignoreCase = true) ||
+                backend.contains("Vulkan", ignoreCase = true)
+            val usesNnapi = backend.contains("NNAPI", ignoreCase = true)
+            val backendEvidence = backend.ifBlank { "No backend reported by engine." }
+            val acceleratorStatus = when {
+                usesNnapi -> "NNAPI execution provider requested; per-op NPU/DSP/GPU placement is not independently verified."
+                usesGpu -> "Accelerator reported by backend string; utilization is not sampled."
+                else -> "No accelerator backend reported."
+            }
             return HardwareJson(
                 backend = backend,
-                cpu = HardwareUnitJson(used = true, utilizationPercent = null, measurementStatus = ""),
-                gpu = HardwareUnitJson(used = false, utilizationPercent = null, measurementStatus = ""),
-                npu = HardwareUnitJson(used = false, utilizationPercent = null, measurementStatus = ""),
-                profiling = ProfilingJson(tool = null, evidence = null),
+                cpu = HardwareUnitJson(
+                    used = true,
+                    utilizationPercent = null,
+                    measurementStatus = measurementStatus.ifBlank { "Process-level CPU fallback remains possible." },
+                ),
+                gpu = HardwareUnitJson(
+                    used = usesGpu,
+                    utilizationPercent = null,
+                    measurementStatus = if (usesGpu) acceleratorStatus else "Not reported by backend.",
+                ),
+                npu = HardwareUnitJson(
+                    used = usesNnapi,
+                    utilizationPercent = null,
+                    measurementStatus = if (usesNnapi) acceleratorStatus else "Not reported by backend.",
+                ),
+                profiling = ProfilingJson(
+                    tool = "engine backend string",
+                    evidence = "$backendEvidence Measurement status: ${measurementStatus.ifBlank { "UNSPECIFIED" }}",
+                ),
             )
         }
     }

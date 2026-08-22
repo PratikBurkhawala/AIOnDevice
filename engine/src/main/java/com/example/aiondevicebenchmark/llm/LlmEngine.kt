@@ -18,11 +18,13 @@ fun interface EngineFactory {
 }
 
 enum class EngineType(val displayName: String) {
-    LLAMA_CPP("llama.cpp");
+    LLAMA_CPP("llama.cpp"),
+    ONNX_RUNTIME("ONNX Runtime");
 
     val storageName: String
         get() = when (this) {
             LLAMA_CPP -> "llama"
+            ONNX_RUNTIME -> "onnx"
         }
 }
 
@@ -38,6 +40,9 @@ data class ModelConfig(
     val format: String = "GGUF",
     val fileName: String = "model-q4_k_m.gguf",
     val filePath: String = "",
+    val tokenizerFileName: String = "",
+    val tokenizerFilePath: String = "",
+    val tokenizerDownloadUrl: String = "",
     val quantization: String = "Q4_K_M",
     val fileSizeBytes: Long? = null,
     val contextSize: Int = 2048,
@@ -77,4 +82,13 @@ data class EngineInfo(
     val threads: Int,
     val gpuLayers: Int,
     val measurementStatus: String,
+    val modelInputs: List<EngineTensorInfo> = emptyList(),
+    val modelOutputs: List<EngineTensorInfo> = emptyList(),
+)
+
+data class EngineTensorInfo(
+    val name: String,
+    val kind: String,
+    val dataType: String,
+    val shape: List<String>,
 )

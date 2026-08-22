@@ -8,6 +8,7 @@ class LlamaEngineFactory : EngineFactory {
     override fun create(type: EngineType): LlmEngine {
         return when (type) {
             EngineType.LLAMA_CPP -> LlamaCppEngine()
+            else -> error("Unsupported llama.cpp engine type: $type")
         }
     }
 }

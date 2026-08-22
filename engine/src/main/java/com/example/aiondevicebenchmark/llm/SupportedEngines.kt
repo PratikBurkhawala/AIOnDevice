@@ -51,6 +51,64 @@ class DefaultEngineCatalog : EngineCatalog {
                 description = "Largest included option. Use for quality-focused runs on devices with enough RAM.",
             ),
         ),
+        EngineType.ONNX_RUNTIME to listOf(
+            ModelConfig(
+                engineType = EngineType.ONNX_RUNTIME,
+                name = "Qwen2.5-0.5B-Instruct-ONNX-Q4",
+                parameters = "0.5B",
+                format = "ONNX",
+                fileName = "Qwen2.5-0.5B-Instruct-model_q4.onnx",
+                quantization = "Q4",
+                fileSizeBytes = 786_156_820L,
+                contextSize = 512,
+                downloadUrl = "https://huggingface.co/onnx-community/Qwen2.5-0.5B-Instruct/resolve/main/onnx/model_q4.onnx",
+                tokenizerFileName = "Qwen2.5-0.5B-Instruct-tokenizer.json",
+                tokenizerDownloadUrl = "https://huggingface.co/onnx-community/Qwen2.5-0.5B-Instruct/resolve/main/tokenizer.json",
+                downloadSizeLabel = "786 MB",
+                description = "ONNX Q4 pick from the Qwen family in the 0.5B-3B range.",
+            ),
+            ModelConfig(
+                engineType = EngineType.ONNX_RUNTIME,
+                name = "Qwen2.5-0.5B-Instruct-ONNX-Q8",
+                parameters = "0.5B",
+                format = "ONNX",
+                fileName = "Qwen2.5-0.5B-Instruct-model_int8.onnx",
+                quantization = "Q8",
+                fileSizeBytes = 512_000_000L,
+                contextSize = 512,
+                downloadUrl = "https://huggingface.co/onnx-community/Qwen2.5-0.5B-Instruct/resolve/main/onnx/model_int8.onnx",
+                tokenizerFileName = "Qwen2.5-0.5B-Instruct-tokenizer.json",
+                tokenizerDownloadUrl = "https://huggingface.co/onnx-community/Qwen2.5-0.5B-Instruct/resolve/main/tokenizer.json",
+                downloadSizeLabel = "512 MB",
+                description = "ONNX INT8 pick shown as Q8 from the Qwen family in the 0.5B-3B range.",
+            ),
+            ModelConfig(
+                engineType = EngineType.ONNX_RUNTIME,
+                name = "SmolLM2-1.7B-Instruct-ONNX-Q4",
+                parameters = "1.7B",
+                format = "ONNX",
+                fileName = "SmolLM2-1.7B-Instruct-model_q4.onnx",
+                quantization = "Q4",
+                fileSizeBytes = 1_411_969_607L,
+                contextSize = 512,
+                downloadUrl = "https://huggingface.co/HuggingFaceTB/SmolLM2-1.7B-Instruct/resolve/main/onnx/model_q4.onnx",
+                downloadSizeLabel = "1.41 GB",
+                description = "ONNX Q4 pick from the SmolLM family in the 0.5B-3B range.",
+            ),
+            ModelConfig(
+                engineType = EngineType.ONNX_RUNTIME,
+                name = "SmolLM2-1.7B-Instruct-ONNX-Q8",
+                parameters = "1.7B",
+                format = "ONNX",
+                fileName = "SmolLM2-1.7B-Instruct-model_int8.onnx",
+                quantization = "Q8",
+                fileSizeBytes = 1_714_119_778L,
+                contextSize = 512,
+                downloadUrl = "https://huggingface.co/HuggingFaceTB/SmolLM2-1.7B-Instruct/resolve/main/onnx/model_int8.onnx",
+                downloadSizeLabel = "1.71 GB",
+                description = "ONNX INT8 pick shown as Q8 from the SmolLM family in the 0.5B-3B range.",
+            ),
+        ),
     )
 
     override val engines: List<EngineType> = engineModels.keys.toList()
@@ -65,7 +123,7 @@ class DefaultEngineCatalog : EngineCatalog {
     }
 
     private fun detectQuantization(value: String): String? {
-        val known = listOf("Q2_K", "Q3_K_M", "Q4_K_M", "Q5_K_M", "Q6_K", "Q8_0", "F16")
+        val known = listOf("Q2_K", "Q3_K_M", "Q4_K_M", "Q5_K_M", "Q6_K", "Q8_0", "Q4", "Q8", "F16")
         val normalized = value.uppercase()
         return known.firstOrNull { normalized.contains(it) }
     }

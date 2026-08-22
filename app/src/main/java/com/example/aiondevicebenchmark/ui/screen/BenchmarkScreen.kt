@@ -91,9 +91,9 @@ private fun BenchmarkConfigScreen(
             modifier = Modifier.fillMaxWidth(),
             enabled = enabled,
             readOnly = true,
-            label = { Text("Local GGUF path") },
+            label = { Text("Local model path") },
         )
-        KeyValueRow("Acceleration", "CPU via llama.cpp. GPU/NPU acceleration is not enabled in this APK.")
+        KeyValueRow("Acceleration", "llama.cpp uses Vulkan GPU when available. ONNX Runtime tries NNAPI and otherwise uses CPU.")
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Condition", style = MaterialTheme.typography.labelLarge)
@@ -122,6 +122,9 @@ private fun BenchmarkConfigScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             NumericField("Max output", state.maxOutputTokensInput, enabled, { onEvent(BenchmarkUiEvent.UpdateMaxOutputTokens(it)) }, Modifier.weight(1f))
             NumericField("Generations", state.generationsInput, enabled, { onEvent(BenchmarkUiEvent.UpdateConsecutiveGenerations(it)) }, Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            NumericField("RAM sample sec", state.ramSamplingIntervalInput, enabled, { onEvent(BenchmarkUiEvent.UpdateRamSamplingInterval(it)) }, Modifier.weight(1f))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             NumericField("Temperature", state.temperatureInput, enabled, { onEvent(BenchmarkUiEvent.UpdateTemperature(it)) }, Modifier.weight(1f), KeyboardType.Decimal)

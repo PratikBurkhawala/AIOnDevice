@@ -18,3 +18,4 @@ rootProject.name = "AiOnDeviceBenchmark"
 include(":app")
 include(":engine")
 include(":llama-engine")
+include(":onnx-engine")

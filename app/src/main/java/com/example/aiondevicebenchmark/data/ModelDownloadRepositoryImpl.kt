@@ -38,7 +38,7 @@ class ModelDownloadRepositoryImpl(
                 val file = localFile(model)
                 val state = when {
                     existing?.isDownloading == true -> existing
-                    file.exists() && file.length() > 0L -> downloadedState(model, file)
+                    file.exists() && file.length() > 0L && requiredExtraFilesReady(model) -> downloadedState(model, file)
                     existing?.status == ModelDownloadStatus.Failed -> existing
                     else -> notDownloadedState(model)
                 }
@@ -57,7 +57,13 @@ class ModelDownloadRepositoryImpl(
         }
         val destination = localFile(model)
         if (destination.exists() && destination.length() > 0L) {
-            setState(model, downloadedState(model, destination))
+            if (requiredExtraFilesReady(model)) {
+                setState(model, downloadedState(model, destination))
+                return
+            }
+            scope.launch {
+                downloadTokenizerOnly(model, destination)
+            }
             return
         }
 
@@ -73,7 +79,9 @@ class ModelDownloadRepositoryImpl(
         }
         val destination = localFile(model)
         val partial = File(destination.parentFile, "${destination.name}.part")
-        val deleted = listOf(destination, partial)
+        val tokenizer = tokenizerFile(model)
+        val tokenizerPartial = tokenizer?.let { File(it.parentFile, "${it.name}.part") }
+        val deleted = listOfNotNull(destination, partial, tokenizer, tokenizerPartial)
             .filter { it.exists() }
             .fold(false) { anyDeleted, file -> file.delete() || anyDeleted }
         setState(model, notDownloadedState(model))
@@ -89,7 +97,15 @@ class ModelDownloadRepositoryImpl(
 
     override fun localModel(model: ModelConfig): ModelConfig {
         val state = stateFor(model)
-        return if (state.isReady) model.copy(filePath = state.localPath, fileSizeBytes = state.totalBytes) else model.copy(filePath = "")
+        return if (state.isReady) {
+            model.copy(
+                filePath = state.localPath,
+                tokenizerFilePath = tokenizerFile(model)?.takeIf { it.exists() && it.length() > 0L }?.absolutePath.orEmpty(),
+                fileSizeBytes = state.totalBytes,
+            )
+        } else {
+            model.copy(filePath = "", tokenizerFilePath = "")
+        }
     }
 
     override fun storageDirectory(engineType: EngineType): File = engineDirectory(engineType)
@@ -134,13 +150,8 @@ class ModelDownloadRepositoryImpl(
                 }
             }
 
-            if (destination.exists()) {
-                destination.delete()
-            }
-            if (!partial.renameTo(destination)) {
-                partial.copyTo(destination, overwrite = true)
-                partial.delete()
-            }
+            movePartialToDestination(partial, destination)
+            downloadTokenizerIfNeeded(model)
             setState(model, downloadedState(model, destination))
         } catch (error: Exception) {
             partial.delete()
@@ -178,6 +189,68 @@ class ModelDownloadRepositoryImpl(
     }
 
     private fun localFile(model: ModelConfig): File = File(engineDirectory(model.engineType), model.fileName)
+
+    private fun tokenizerFile(model: ModelConfig): File? {
+        return model.tokenizerFileName.takeIf { it.isNotBlank() }?.let { File(engineDirectory(model.engineType), it) }
+    }
+
+    private fun requiredExtraFilesReady(model: ModelConfig): Boolean {
+        val tokenizer = tokenizerFile(model) ?: return true
+        return tokenizer.exists() && tokenizer.length() > 0L
+    }
+
+    private fun downloadTokenizerIfNeeded(model: ModelConfig) {
+        val destination = tokenizerFile(model) ?: return
+        if (model.tokenizerDownloadUrl.isBlank()) return
+        if (destination.exists() && destination.length() > 0L) return
+
+        val partial = File(destination.parentFile, "${destination.name}.part")
+        var connection: HttpURLConnection? = null
+        try {
+            setState(model, stateFor(model).copy(message = "Downloading tokenizer"))
+            connection = (URL(model.tokenizerDownloadUrl).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 30_000
+                readTimeout = 30_000
+                instanceFollowRedirects = true
+                requestMethod = "GET"
+            }
+            val responseCode = connection.responseCode
+            if (responseCode !in 200..299) {
+                throw IllegalStateException("Tokenizer download failed: HTTP $responseCode")
+            }
+            connection.inputStream.use { input ->
+                partial.outputStream().use { output -> input.copyTo(output) }
+            }
+            movePartialToDestination(partial, destination)
+        } finally {
+            connection?.disconnect()
+            partial.delete()
+        }
+    }
+
+    private fun downloadTokenizerOnly(model: ModelConfig, modelFile: File) {
+        setState(model, notDownloadedState(model).copy(status = ModelDownloadStatus.Downloading, message = "Downloading tokenizer"))
+        var backgroundWork: Closeable? = null
+        try {
+            backgroundWork = backgroundWorkTracker.begin("Downloading tokenizer for ${model.name}")
+            downloadTokenizerIfNeeded(model)
+            setState(model, downloadedState(model, modelFile))
+        } catch (error: Exception) {
+            setFailed(model, "Tokenizer download failed: ${error.message ?: error::class.java.simpleName}")
+        } finally {
+            backgroundWork?.close()
+        }
+    }
+
+    private fun movePartialToDestination(partial: File, destination: File) {
+        if (destination.exists()) {
+            destination.delete()
+        }
+        if (!partial.renameTo(destination)) {
+            partial.copyTo(destination, overwrite = true)
+            partial.delete()
+        }
+    }
 
     private fun engineDirectory(engineType: EngineType): File = File(rootModelDirectory, engineType.storageName)
 

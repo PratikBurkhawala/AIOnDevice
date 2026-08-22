@@ -2,12 +2,15 @@ package com.example.aiondevicebenchmark.ui.screen
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.aiondevicebenchmark.data.SavedJsonFile
+import com.example.aiondevicebenchmark.ui.benchmark.BenchmarkUiEvent
 import com.example.aiondevicebenchmark.ui.composable.KeyValueTable
 import com.example.aiondevicebenchmark.ui.composable.SectionTitle
 import com.example.aiondevicebenchmark.ui.composable.formatFileSizeGb
@@ -27,13 +30,21 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 
 @Composable
-fun JsonDetailScreen(file: SavedJsonFile?) {
+fun JsonDetailScreen(
+    file: SavedJsonFile?,
+    onEvent: (BenchmarkUiEvent) -> Unit,
+) {
     if (file == null) {
         Text("Select a JSON file from Saved JSON.")
         return
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionTitle("JSON Detail")
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionTitle("JSON Detail")
+            OutlinedButton(onClick = { onEvent(BenchmarkUiEvent.ShareJson(file.absolutePath)) }) {
+                Text("Share JSON")
+            }
+        }
         Text(file.fileName, fontWeight = FontWeight.SemiBold)
         KeyValueTable(rows = remember(file.rawJson) { flattenedJsonRows(file.rawJson) })
     }
@@ -70,6 +81,12 @@ private fun MutableList<Pair<String, String>>.flattenJson(path: String, element:
 private fun String.child(key: String): String = if (isBlank()) key else "$this.$key"
 
 private fun displayLabel(path: String): String {
+    val inferencePath = Regex("""inferenceRuns\[(\d+)]\.(.+)""").matchEntire(path)
+    if (inferencePath != null) {
+        val index = inferencePath.groupValues[1].toInt() + 1
+        val childPath = inferencePath.groupValues[2]
+        return "Inference Run $index - ${labelOverrides[childPath] ?: readablePath(childPath)}"
+    }
     val resultPath = Regex("""results\[(\d+)]\.(.+)""").matchEntire(path)
     if (resultPath != null) {
         val index = resultPath.groupValues[1].toInt() + 1
@@ -88,6 +105,8 @@ private fun displayPrimitive(path: String, primitive: JsonPrimitive): String {
             path.endsWith("peakAppPssMb") ||
                 path.endsWith("ramBeforeLoadMb") ||
                 path.endsWith("ramAfterLoadMb") ||
+                path.endsWith("beforeModelLoadMb") ||
+                path.endsWith("afterModelLoadMb") ||
                 path.endsWith("beforeGenerationMb") ||
                 path.endsWith("afterGenerationMb") ||
                 path.endsWith("afterModelUnloadMb") ||
@@ -95,7 +114,9 @@ private fun displayPrimitive(path: String, primitive: JsonPrimitive): String {
             else -> value.toString()
         }
     }
-    primitive.doubleOrNull?.let { return it.toString() }
+    primitive.doubleOrNull?.let {
+        return if (isMillisecondPath(path)) formatSeconds(it.toLong()) else it.toString()
+    }
     val text = primitive.jsonPrimitive.contentOrNull.orEmpty()
     if (text.isPlaceholder()) return ""
     val localTimestamp = formatLocalTimestamp(text)
@@ -150,6 +171,7 @@ private val labelOverrides = mapOf(
     "runtime.engine" to "Engine",
     "runtime.version" to "Engine Version",
     "runtime.backend" to "Backend",
+    "runtime.measurementStatus" to "Measurement Status",
     "runtime.threads" to "Threads",
     "runtime.gpuLayers" to "GPU Layers",
     "model.name" to "Model Name",
@@ -168,11 +190,35 @@ private val labelOverrides = mapOf(
     "prompt.promptId" to "Prompt ID",
     "prompt.inputTokenCount" to "Input Tokens",
     "prompt.outputTokenTarget" to "Output Token Target",
+    "battery.beforeStart.timestamp" to "Battery Before Time",
+    "battery.beforeStart.percentage" to "Battery Before",
+    "battery.beforeStart.temperatureC" to "Battery Temperature Before",
+    "battery.beforeStart.charging" to "Charging Before",
+    "battery.beforeStart.batterySaver" to "Battery Saver Before",
+    "battery.afterEnd.timestamp" to "Battery After Time",
+    "battery.afterEnd.percentage" to "Battery After",
+    "battery.afterEnd.temperatureC" to "Battery Temperature After",
+    "battery.afterEnd.charging" to "Charging After",
+    "battery.afterEnd.batterySaver" to "Battery Saver After",
+    "battery.drainPercentage" to "Battery Drain",
+    "battery.thermalStatus" to "Thermal Status",
+    "ram.samplingIntervalMs" to "RAM Sampling Interval",
+    "ram.beforeModelLoadMb" to "RAM Before Model Load",
+    "ram.afterModelLoadMb" to "RAM After Model Load",
+    "ram.afterModelUnloadMb" to "RAM After Model Unload",
+    "ram.peakAppPssMb" to "Peak RAM",
     "modelLoading.loadStart" to "Model Load Start",
     "modelLoading.loadEnd" to "Model Load End",
     "modelLoading.loadTimeMs" to "Model Load Time",
-    "modelLoading.ramBeforeLoadMb" to "RAM Before Load",
-    "modelLoading.ramAfterLoadMb" to "RAM After Load",
+    "index" to "Index",
+    "timestamp.start" to "Start Time",
+    "timestamp.end" to "End Time",
+    "condition.type" to "Condition",
+    "condition.screenOn" to "Screen On",
+    "condition.appState" to "App State",
+    "condition.memoryPressure" to "Memory Pressure",
+    "condition.consecutiveGenerationNumber" to "Generation Number",
+    "condition.totalConsecutiveGenerations" to "Total Generations",
     "inference.generationStart" to "Generation Start",
     "inference.firstTokenTime" to "First Token Time",
     "inference.generatedText" to "Generated Response",
@@ -213,15 +259,24 @@ private val labelOverrides = mapOf(
     "modelUnloading.unloadTimeMs" to "Model Unload Time",
     "result.status" to "Status",
     "result.error" to "Error",
+    "summary.totalInferenceRuns" to "Total Inference Runs",
+    "summary.successfulRuns" to "Successful Runs",
+    "summary.failedRuns" to "Failed Runs",
+    "summary.averageTtftMs" to "Average Time To First Token",
+    "summary.averagePrefillTokensPerSecond" to "Average Prefill Tokens Per Second",
+    "summary.averageDecodeTokensPerSecond" to "Average Decode Tokens Per Second",
+    "summary.peakAppPssMb" to "Peak RAM",
+    "summary.batteryDrainPercentage" to "Battery Drain",
     "observation.summary" to "Observation Summary",
 )
 
 private fun readablePath(path: String): String {
-    val memorySample = Regex("""memory\.samples\[(\d+)]\.(timestamp|appPssMb)""").matchEntire(path)
+    val memorySample = Regex("""(?:memory|ram)\.samples\[(\d+)]\.(timestamp|phase|appPssMb)""").matchEntire(path)
     if (memorySample != null) {
         val index = memorySample.groupValues[1].toInt() + 1
         return when (memorySample.groupValues[2]) {
             "timestamp" -> "Memory Sample $index Time"
+            "phase" -> "Memory Sample $index Phase"
             else -> "Memory Sample $index RAM"
         }
     }

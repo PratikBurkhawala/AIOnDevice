@@ -2,6 +2,7 @@ package com.example.aiondevicebenchmark.telemetry
 
 import android.content.Context
 import android.os.PowerManager
+import com.example.aiondevicebenchmark.AppVisibilityTracker
 import com.example.aiondevicebenchmark.data.BatterySnapshotJson
 import com.example.aiondevicebenchmark.data.DeviceJson
 
@@ -15,5 +16,6 @@ class TelemetryCollector(context: Context) {
     fun collectDeviceInfo(): DeviceJson = deviceInfoCollector.collect()
     fun collectBattery(): BatterySnapshotJson = batteryMonitor.snapshot()
     fun isScreenOn(): Boolean = powerManager?.isInteractive ?: true
+    fun appState(): String = AppVisibilityTracker.currentState
     fun thermalStatus(): String = ThermalMonitor(appContext).status()
 }

@@ -9,6 +9,9 @@ sealed interface BenchmarkUiEvent {
     data class SelectJson(val fileName: String) : BenchmarkUiEvent
     data object RefreshSavedFiles : BenchmarkUiEvent
     data class DeleteJson(val fileName: String) : BenchmarkUiEvent
+    data class ShareJson(val absolutePath: String) : BenchmarkUiEvent
+    data class DeleteCrashReport(val fileName: String) : BenchmarkUiEvent
+    data class ShareCrashReport(val absolutePath: String) : BenchmarkUiEvent
     data object ShareReportCsv : BenchmarkUiEvent
     data object StartBenchmark : BenchmarkUiEvent
     data class DownloadModel(val model: ModelConfig) : BenchmarkUiEvent
@@ -21,6 +24,7 @@ sealed interface BenchmarkUiEvent {
     data class UpdatePrompt(val value: String) : BenchmarkUiEvent
     data class UpdateMaxOutputTokens(val value: String) : BenchmarkUiEvent
     data class UpdateConsecutiveGenerations(val value: String) : BenchmarkUiEvent
+    data class UpdateRamSamplingInterval(val value: String) : BenchmarkUiEvent
     data class UpdateTemperature(val value: String) : BenchmarkUiEvent
     data class UpdateTopK(val value: String) : BenchmarkUiEvent
     data class UpdateTopP(val value: String) : BenchmarkUiEvent

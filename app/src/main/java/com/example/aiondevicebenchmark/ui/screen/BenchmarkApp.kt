@@ -118,10 +118,15 @@ fun BenchmarkApp(
                         files = state.savedFiles,
                         onEvent = onEvent,
                     )
-                    AppScreen.JsonDetail -> JsonDetailScreen(file = state.selectedFile)
+                    AppScreen.JsonDetail -> JsonDetailScreen(file = state.selectedFile, onEvent = onEvent)
                     AppScreen.Report -> ReportScreen(
                         files = state.reportFiles,
+                        crashReports = state.crashReports,
                         loading = state.reportLoading,
+                        onEvent = onEvent,
+                    )
+                    AppScreen.Crashes -> CrashReportScreen(
+                        crashReports = state.crashReports,
                         onEvent = onEvent,
                     )
                 }

@@ -29,6 +29,7 @@ data class BenchmarkConfig(
     val promptId: String = "P001",
     val prompt: String = DefaultPrompt.text,
     val consecutiveGenerations: Int = 1,
+    val ramSamplingIntervalSeconds: Int = 60,
     val generation: GenerationConfig = GenerationConfig(),
 )
 

@@ -3,11 +3,13 @@ package com.example.aiondevicebenchmark.di
 import com.example.aiondevicebenchmark.background.BackgroundWorkTracker
 import com.example.aiondevicebenchmark.benchmark.BenchmarkController
 import com.example.aiondevicebenchmark.benchmark.BenchmarkRunner
+import com.example.aiondevicebenchmark.data.CrashReportStore
 import com.example.aiondevicebenchmark.data.JsonRepository
 import com.example.aiondevicebenchmark.data.ModelDownloadRepositoryImpl
 import com.example.aiondevicebenchmark.domain.repository.BenchmarkResultRepository
 import com.example.aiondevicebenchmark.domain.repository.ModelDownloadRepository
 import com.example.aiondevicebenchmark.domain.usecase.DeleteSavedJsonFileUseCase
+import com.example.aiondevicebenchmark.domain.usecase.DeleteCrashReportUseCase
 import com.example.aiondevicebenchmark.domain.usecase.DeleteModelUseCase
 import com.example.aiondevicebenchmark.domain.usecase.DetectModelQuantizationUseCase
 import com.example.aiondevicebenchmark.domain.usecase.FindSavedJsonFileUseCase
@@ -17,15 +19,20 @@ import com.example.aiondevicebenchmark.domain.usecase.GetModelsForEngineUseCase
 import com.example.aiondevicebenchmark.domain.usecase.GetSupportedEnginesUseCase
 import com.example.aiondevicebenchmark.domain.usecase.LocalizeModelUseCase
 import com.example.aiondevicebenchmark.domain.usecase.ListSavedJsonFilesUseCase
+import com.example.aiondevicebenchmark.domain.usecase.ListCrashReportsUseCase
 import com.example.aiondevicebenchmark.domain.usecase.ObserveModelDownloadsUseCase
 import com.example.aiondevicebenchmark.domain.usecase.RefreshModelDownloadsUseCase
 import com.example.aiondevicebenchmark.domain.usecase.ShareReportCsvUseCase
+import com.example.aiondevicebenchmark.domain.usecase.ShareCrashReportUseCase
+import com.example.aiondevicebenchmark.domain.usecase.ShareJsonFileUseCase
 import com.example.aiondevicebenchmark.domain.usecase.StartModelDownloadUseCase
 import com.example.aiondevicebenchmark.domain.usecase.StartBenchmarkUseCase
 import com.example.aiondevicebenchmark.llama.LlamaEngineFactory
 import com.example.aiondevicebenchmark.llm.DefaultEngineCatalog
 import com.example.aiondevicebenchmark.llm.EngineCatalog
 import com.example.aiondevicebenchmark.llm.EngineFactory
+import com.example.aiondevicebenchmark.llm.EngineType
+import com.example.aiondevicebenchmark.onnx.OnnxEngineFactory
 import com.example.aiondevicebenchmark.telemetry.TelemetryCollector
 import com.example.aiondevicebenchmark.ui.benchmark.BenchmarkViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -37,13 +44,23 @@ import org.koin.dsl.module
 
 val engineModule = module {
     single<EngineCatalog> { DefaultEngineCatalog() }
-    single<EngineFactory> { LlamaEngineFactory() }
+    single<EngineFactory> {
+        val llamaFactory = LlamaEngineFactory()
+        val onnxFactory = OnnxEngineFactory()
+        EngineFactory { type ->
+            when (type) {
+                EngineType.LLAMA_CPP -> llamaFactory.create(type)
+                EngineType.ONNX_RUNTIME -> onnxFactory.create(type)
+            }
+        }
+    }
 }
 
 val appModule = module {
     single { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
     single { BackgroundWorkTracker(androidContext()) }
     single { TelemetryCollector(androidContext()) }
+    single { CrashReportStore(androidContext()) }
     single<BenchmarkResultRepository> { JsonRepository(androidContext()) }
     single<ModelDownloadRepository> { ModelDownloadRepositoryImpl(androidContext(), get(), get()) }
 
@@ -54,7 +71,11 @@ val appModule = module {
     factory { ListSavedJsonFilesUseCase(repository = get()) }
     factory { FindSavedJsonFileUseCase(repository = get()) }
     factory { DeleteSavedJsonFileUseCase(repository = get()) }
+    factory { ListCrashReportsUseCase(store = get()) }
+    factory { DeleteCrashReportUseCase(store = get()) }
     factory { ShareReportCsvUseCase(context = androidContext(), repository = get()) }
+    factory { ShareJsonFileUseCase(context = androidContext()) }
+    factory { ShareCrashReportUseCase(context = androidContext()) }
     factory { GetSupportedEnginesUseCase(engineCatalog = get()) }
     factory { GetModelsForEngineUseCase(engineCatalog = get()) }
     factory { GetDefaultModelForEngineUseCase(engineCatalog = get()) }
@@ -72,7 +93,11 @@ val appModule = module {
             listSavedJsonFilesUseCase = get(),
             findSavedJsonFileUseCase = get(),
             deleteSavedJsonFileUseCase = get(),
+            listCrashReportsUseCase = get(),
+            deleteCrashReportUseCase = get(),
             shareReportCsvUseCase = get(),
+            shareJsonFileUseCase = get(),
+            shareCrashReportUseCase = get(),
             getSupportedEnginesUseCase = get(),
             getModelsForEngineUseCase = get(),
             getDefaultModelForEngineUseCase = get(),

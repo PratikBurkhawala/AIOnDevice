@@ -10,9 +10,10 @@ import java.time.Instant
 class MemoryMonitor(context: Context) {
     private val activityManager = context.getSystemService(ActivityManager::class.java)
 
-    fun sample(): MemorySampleJson {
+    fun sample(phase: String = ""): MemorySampleJson {
         return MemorySampleJson(
             timestamp = Instant.now().toString(),
+            phase = phase,
             appPssMb = sampleAppPssMb(),
         )
     }

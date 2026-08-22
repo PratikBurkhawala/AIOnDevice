@@ -2,6 +2,7 @@ package com.example.aiondevicebenchmark.ui.benchmark
 
 import com.example.aiondevicebenchmark.benchmark.BenchmarkConfig
 import com.example.aiondevicebenchmark.benchmark.BenchmarkState
+import com.example.aiondevicebenchmark.data.SavedCrashReport
 import com.example.aiondevicebenchmark.data.SavedJsonFile
 import com.example.aiondevicebenchmark.domain.model.ModelDownloadState
 import com.example.aiondevicebenchmark.llm.EngineType
@@ -13,6 +14,7 @@ data class BenchmarkUiState(
     val screen: AppScreen = AppScreen.Benchmark,
     val savedFiles: List<SavedJsonFile> = emptyList(),
     val reportFiles: List<SavedJsonFile> = emptyList(),
+    val crashReports: List<SavedCrashReport> = emptyList(),
     val reportLoading: Boolean = false,
     val selectedFileName: String? = null,
     val selectedFile: SavedJsonFile? = null,
@@ -24,6 +26,7 @@ data class BenchmarkUiState(
     val message: String? = null,
     val maxOutputTokensInput: String = config.generation.maxOutputTokens.toString(),
     val generationsInput: String = config.consecutiveGenerations.toString(),
+    val ramSamplingIntervalInput: String = config.ramSamplingIntervalSeconds.toString(),
     val temperatureInput: String = config.generation.temperature.toString(),
     val topKInput: String = config.generation.topK.toString(),
     val topPInput: String = config.generation.topP.toString(),
