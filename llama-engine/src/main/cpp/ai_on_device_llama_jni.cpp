@@ -37,6 +37,8 @@ static std::once_flag g_backend_once;
 struct GpuBackendInfo {
     bool available = false;
     std::string name;
+    std::string diagnostics;
+    ggml_backend_dev_t device = nullptr;
 };
 
 struct LoadedSession {
@@ -222,8 +224,49 @@ static bool has_handle(const jlong handle) {
     return handle != 0L;
 }
 
+static std::string device_type_name(const enum ggml_backend_dev_type type) {
+    switch (type) {
+        case GGML_BACKEND_DEVICE_TYPE_CPU:
+            return "CPU";
+        case GGML_BACKEND_DEVICE_TYPE_GPU:
+            return "GPU";
+        case GGML_BACKEND_DEVICE_TYPE_IGPU:
+            return "IGPU";
+        case GGML_BACKEND_DEVICE_TYPE_ACCEL:
+            return "ACCEL";
+        case GGML_BACKEND_DEVICE_TYPE_META:
+            return "META";
+        default:
+            return "UNKNOWN";
+    }
+}
+
+static std::string describe_registered_backends() {
+    std::string diagnostics = "Registered backends:";
+    const size_t backend_count = ggml_backend_reg_count();
+    if (backend_count == 0) {
+        return diagnostics + " none";
+    }
+
+    for (size_t i = 0; i < backend_count; ++i) {
+        ggml_backend_reg_t reg = ggml_backend_reg_get(i);
+        diagnostics += " ";
+        diagnostics += ggml_backend_reg_name(reg);
+        diagnostics += "(" + std::to_string(ggml_backend_reg_dev_count(reg)) + ")";
+    }
+    return diagnostics;
+}
+
 static GpuBackendInfo find_gpu_backend() {
+    const std::string backend_diagnostics = describe_registered_backends();
+    LOGI("%s", backend_diagnostics.c_str());
+
     const size_t device_count = ggml_backend_dev_count();
+    if (device_count == 0) {
+        return GpuBackendInfo{false, "", backend_diagnostics + "; devices: none", nullptr};
+    }
+
+    std::string diagnostics = backend_diagnostics + "; devices:";
     for (size_t i = 0; i < device_count; ++i) {
         ggml_backend_dev_t device = ggml_backend_dev_get(i);
         if (!device) {
@@ -232,12 +275,36 @@ static GpuBackendInfo find_gpu_backend() {
 
         ggml_backend_dev_props props{};
         ggml_backend_dev_get_props(device, &props);
+        ggml_backend_reg_t reg = ggml_backend_dev_backend_reg(device);
+        const char * reg_name = reg ? ggml_backend_reg_name(reg) : "unknown";
+        const char * name = props.name ? props.name : ggml_backend_dev_name(device);
+        const char * description = props.description ? props.description : ggml_backend_dev_description(device);
+        const std::string display_name = description ? description : (name ? name : "Vulkan GPU");
+        diagnostics += " [";
+        diagnostics += std::to_string(i);
+        diagnostics += ":";
+        diagnostics += reg_name ? reg_name : "unknown";
+        diagnostics += "/";
+        diagnostics += device_type_name(props.type);
+        diagnostics += "/";
+        diagnostics += display_name;
+        diagnostics += "]";
+        LOGI(
+            "llama.cpp backend device %zu: reg=%s type=%s name=%s description=%s memory=%zu/%zu",
+            i,
+            reg_name ? reg_name : "unknown",
+            device_type_name(props.type).c_str(),
+            name ? name : "",
+            description ? description : "",
+            props.memory_free,
+            props.memory_total
+        );
+
         if (props.type == GGML_BACKEND_DEVICE_TYPE_GPU || props.type == GGML_BACKEND_DEVICE_TYPE_IGPU) {
-            const char * name = props.description ? props.description : props.name;
-            return GpuBackendInfo{true, name ? name : "Vulkan GPU"};
+            return GpuBackendInfo{true, display_name, diagnostics, device};
         }
     }
-    return GpuBackendInfo{};
+    return GpuBackendInfo{false, "", diagnostics, nullptr};
 }
 
 static LoadedSession try_load_session(
@@ -245,10 +312,19 @@ static LoadedSession try_load_session(
     const uint32_t n_ctx,
     const uint32_t n_batch,
     const int threads,
-    const bool prefer_gpu
+    const bool prefer_gpu,
+    ggml_backend_dev_t gpu_device
 ) {
     llama_model_params model_params = llama_model_default_params();
     model_params.n_gpu_layers = prefer_gpu ? -1 : 0;
+    std::vector<ggml_backend_dev_t> devices;
+    if (prefer_gpu && gpu_device) {
+        devices.push_back(gpu_device);
+        devices.push_back(nullptr);
+        model_params.devices = devices.data();
+        model_params.split_mode = LLAMA_SPLIT_MODE_NONE;
+        model_params.main_gpu = 0;
+    }
 
     llama_model * model = llama_model_load_from_file(model_path.c_str(), model_params);
     if (!model) {
@@ -325,19 +401,21 @@ Java_com_example_aiondevicebenchmark_llama_NativeLlamaBridge_loadModel(
         std::string backend = "CPU";
         if (gpu.available) {
             LOGI("llama.cpp GPU backend available: %s", gpu.name.c_str());
-            loaded = try_load_session(model_path, n_ctx, n_batch, threads, true);
+            loaded = try_load_session(model_path, n_ctx, n_batch, threads, true, gpu.device);
             if (loaded.session) {
                 backend = "GPU: " + gpu.name;
             } else {
-                LOGE("llama.cpp GPU load failed; falling back to CPU");
+                LOGE("llama.cpp GPU load failed; falling back to CPU. %s", gpu.diagnostics.c_str());
             }
         } else {
-            LOGI("llama.cpp GPU backend unavailable; using CPU");
+            LOGI("llama.cpp GPU backend unavailable; using CPU. %s", gpu.diagnostics.c_str());
         }
 
         if (!loaded.session) {
-            loaded = try_load_session(model_path, n_ctx, n_batch, threads, false);
-            backend = gpu.available ? "CPU (GPU fallback)" : "CPU";
+            loaded = try_load_session(model_path, n_ctx, n_batch, threads, false, nullptr);
+            backend = gpu.available
+                ? "CPU (GPU fallback: " + gpu.name + ")"
+                : "CPU (GPU unavailable)";
         }
 
         if (!loaded.session) {
