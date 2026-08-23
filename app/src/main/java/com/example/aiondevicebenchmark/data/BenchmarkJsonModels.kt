@@ -169,6 +169,10 @@ data class PromptJson(
     val promptId: String,
     val inputTokenCount: Int?,
     val outputTokenTarget: Int,
+    val text: String = "",
+    val characterCount: Int = text.length,
+    val engineInputText: String = text,
+    val engineInputCharacterCount: Int = engineInputText.length,
 )
 
 @Serializable

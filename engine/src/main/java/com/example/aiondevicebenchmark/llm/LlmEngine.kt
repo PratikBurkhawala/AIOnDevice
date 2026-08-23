@@ -3,6 +3,7 @@ package com.example.aiondevicebenchmark.llm
 interface LlmEngine {
     suspend fun loadModel(model: ModelConfig): Triple<Boolean, String, LoadResult?>
     suspend fun unloadModel(): Triple<Boolean, String, UnloadResult?>
+    fun effectivePrompt(prompt: String): String = prompt
     fun tokenize(prompt: String): Triple<Boolean, String, TokenizationResult?>
     suspend fun generate(
         prompt: String,

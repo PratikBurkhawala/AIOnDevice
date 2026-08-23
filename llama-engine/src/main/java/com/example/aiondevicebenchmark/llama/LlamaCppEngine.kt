@@ -97,6 +97,8 @@ internal class LlamaCppEngine : LlmEngine {
         return success(UnloadResult(unloadTimeMs = nativeResult.third ?: 0L))
     }
 
+    override fun effectivePrompt(prompt: String): String = formatPrompt(prompt)
+
     override fun tokenize(prompt: String): Triple<Boolean, String, TokenizationResult?> {
         if (handle == 0L) {
             return failure("Model must be loaded before tokenization.")

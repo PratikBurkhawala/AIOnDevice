@@ -28,6 +28,7 @@ internal class OnnxRuntimeEngine : LlmEngine {
     private var session: OrtSession? = null
     private var tokenizer: ByteLevelBpeTokenizer? = null
     private var loadedModelName: String = ""
+    private var loadedContextSize: Int = DEFAULT_CONTEXT_TOKENS
     private var engineInfo = EngineInfo(
         name = "ONNX Runtime",
         version = "native",
@@ -61,6 +62,7 @@ internal class OnnxRuntimeEngine : LlmEngine {
             session = localSession
             tokenizer = localTokenizer
             loadedModelName = model.name
+            loadedContextSize = model.contextSize.coerceAtLeast(1)
             engineInfo = engineInfo.copy(
                 backend = backend,
                 threads = Runtime.getRuntime().availableProcessors(),
@@ -83,11 +85,14 @@ internal class OnnxRuntimeEngine : LlmEngine {
             session = null
             tokenizer = null
             loadedModelName = ""
+            loadedContextSize = DEFAULT_CONTEXT_TOKENS
             success(UnloadResult(unloadTimeMs = elapsedMs(start)))
         } catch (error: Throwable) {
             failure("ONNX model unload failed: ${error.message ?: error::class.java.simpleName}")
         }
     }
+
+    override fun effectivePrompt(prompt: String): String = formatPrompt(prompt)
 
     override fun tokenize(prompt: String): Triple<Boolean, String, TokenizationResult?> {
         return success(TokenizationResult(tokenCount = formatPrompt(prompt).toTokenIds().size))
@@ -105,9 +110,16 @@ internal class OnnxRuntimeEngine : LlmEngine {
             val totalStart = Instant.now()
             val activeTokenizer = tokenizer
                 ?: return failure("ONNX generation requires tokenizer.json for text decode. Re-download the model so the tokenizer file is present.")
-            val promptTokens = formatPrompt(prompt).toTokenIds().takeLast(MAX_CONTEXT_TOKENS).toMutableList()
+            val promptTokens = formatPrompt(prompt).toTokenIds().toMutableList()
             if (promptTokens.isEmpty()) {
                 promptTokens += DEFAULT_BOS_TOKEN
+            }
+            val outputTarget = config.maxOutputTokens.coerceAtLeast(1)
+            if (promptTokens.size + outputTarget > loadedContextSize) {
+                return failure(
+                    "Prompt and output target exceed ONNX context size. " +
+                        "Prompt tokens=${promptTokens.size}, output target=$outputTarget, context size=$loadedContextSize.",
+                )
             }
 
             val prefillStart = Instant.now()
@@ -123,7 +135,7 @@ internal class OnnxRuntimeEngine : LlmEngine {
             val outputTokens = mutableListOf<Long>()
             var firstTokenMs: Long? = null
             val decodeStart = Instant.now()
-            repeat(config.maxOutputTokens.coerceAtLeast(1)) { index ->
+            repeat(outputTarget) { index ->
                 if (firstTokenMs == null) {
                     firstTokenMs = elapsedMs(totalStart)
                     listener.onFirstToken()
@@ -375,7 +387,7 @@ internal class OnnxRuntimeEngine : LlmEngine {
 
     private companion object {
         const val DEFAULT_BOS_TOKEN = 1L
-        const val MAX_CONTEXT_TOKENS = 128
+        const val DEFAULT_CONTEXT_TOKENS = 512
         const val PSEUDO_VOCAB_BUCKETS = 32000
         val PAST_KEY_VALUE_PATTERN = Regex("""past_key_values\.(\d+)\.(key|value)""")
     }

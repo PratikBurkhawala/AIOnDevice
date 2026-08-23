@@ -80,6 +80,7 @@ class BenchmarkRunner(
         )
         var engine: LlmEngine? = null
         var promptInputTokenCount: Int? = null
+        var engineInputPrompt = config.prompt
         val model = ModelJson.from(config.model, config.generation.maxOutputTokens)
         val generationConfig = GenerationConfigJson.from(config.generation)
 
@@ -115,6 +116,7 @@ class BenchmarkRunner(
             ramSamples += telemetryCollector.memoryMonitor.sample("AFTER_MODEL_LOAD")
             val engineInfo = engine.getEngineInfo()
             runtime = engineInfo.toRuntimeJson()
+            engineInputPrompt = activeEngine.effectivePrompt(config.prompt)
 
             onState(
                 BenchmarkState.Running(runGroupId, 1, totalGenerations, "Tokenizing prompt for input count"),
@@ -185,6 +187,7 @@ class BenchmarkRunner(
                         model = model,
                         generationConfig = generationConfig,
                         promptInputTokenCount = promptInputTokenCount,
+                        engineInputPrompt = engineInputPrompt,
                         modelLoading = ModelLoadingJson(loadStart = loadStart, loadEnd = loadEnd, loadTimeMs = loadTimeMs),
                         inference = inference,
                         memory = MemoryJson(
@@ -239,7 +242,7 @@ class BenchmarkRunner(
                         inference = emptyInference(),
                         result = ResultJson(status = "FAILED", error = message),
                     )
-                    val failureRecord = failureRecord(config, runGroupId, generationNumber, totalGenerations, message)
+                    val failureRecord = failureRecord(config, runGroupId, generationNumber, totalGenerations, message, engineInputPrompt)
                     records += failureRecord
                     onState(
                         BenchmarkState.Running(runGroupId, generationNumber, totalGenerations, "Failure captured"),
@@ -281,6 +284,7 @@ class BenchmarkRunner(
                 generationNumber = records.size + 1,
                 totalGenerations = totalGenerations,
                 error = error.message ?: error::class.java.simpleName,
+                engineInputPrompt = engineInputPrompt,
             )
             records += failureRecord
             onState(
@@ -314,6 +318,10 @@ class BenchmarkRunner(
                     promptId = config.promptId,
                     inputTokenCount = promptInputTokenCount,
                     outputTokenTarget = config.generation.maxOutputTokens,
+                    text = config.prompt,
+                    characterCount = config.prompt.length,
+                    engineInputText = engineInputPrompt,
+                    engineInputCharacterCount = engineInputPrompt.length,
                 ),
                 battery = RunBatteryJson(
                     beforeStart = TimestampedBatterySnapshotJson.from(runStart, batteryBefore),
@@ -366,6 +374,7 @@ class BenchmarkRunner(
         generationNumber: Int,
         totalGenerations: Int,
         error: String,
+        engineInputPrompt: String = config.prompt,
     ): BenchmarkRecord {
         val now = Instant.now().toString()
         val battery = telemetryCollector.collectBattery()
@@ -400,6 +409,10 @@ class BenchmarkRunner(
                 promptId = config.promptId,
                 inputTokenCount = null,
                 outputTokenTarget = config.generation.maxOutputTokens,
+                text = config.prompt,
+                characterCount = config.prompt.length,
+                engineInputText = engineInputPrompt,
+                engineInputCharacterCount = engineInputPrompt.length,
             ),
             modelLoading = ModelLoadingJson(
                 loadStart = "",
@@ -444,6 +457,7 @@ class BenchmarkRunner(
         model: ModelJson,
         generationConfig: GenerationConfigJson,
         promptInputTokenCount: Int?,
+        engineInputPrompt: String,
         modelLoading: ModelLoadingJson,
         inference: InferenceJson,
         memory: MemoryJson,
@@ -468,6 +482,10 @@ class BenchmarkRunner(
                 promptId = config.promptId,
                 inputTokenCount = promptInputTokenCount,
                 outputTokenTarget = config.generation.maxOutputTokens,
+                text = config.prompt,
+                characterCount = config.prompt.length,
+                engineInputText = engineInputPrompt,
+                engineInputCharacterCount = engineInputPrompt.length,
             ),
             modelLoading = modelLoading,
             inference = inference,
