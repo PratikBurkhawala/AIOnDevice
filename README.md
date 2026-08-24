@@ -44,6 +44,8 @@ Default generation settings in code:
 
 ### Results
 
+All `llama.cpp` rows used a 500-token output count. The ONNX rows are the exception and were run with their experimental ONNX configuration.
+
 | Generations | Model | Quant | Runtime | Backend | Prefill tok/s | Decode tok/s | TTFT | Peak RAM | Battery drain | Load time | Condition |
 | ---: | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | 10 | Qwen2.5-0.5B-Instruct | Q4_K_M | llama.cpp | GPU: Mali-G68 | 4.64 | 2.52 | 65.125 s | 798 MB | 4% | 0.696 s | SUSTAINED_LOAD |
@@ -104,19 +106,15 @@ I did not capture enough repeated runs per exact configuration to separate stabl
 
 ### What I'd Try Next With Another Week
 
-First, I would add explicit CPU/GPU controls to the UI: CPU thread count, GPU layer count, context size, and output token cap. Then I would run the same prompt across CPU-only, GPU-only or max-offload, and partial-offload configurations.
+First, I would run the same prompt across CPU-only, GPU-only or max-offload, and partial-offload configurations.
 
 Second, I would measure UI responsiveness during inference, not only model throughput. The key question is whether CPU-only with capped threads gives a smoother app than GPU offload during the prefill phase.
 
-Third, I would build a safer default-configuration table per model. Smaller Qwen models can start with more aggressive defaults, while larger SmolLM2 models need more conservative context and output settings to avoid crashes or long stalls.
+Third, I would repeat every row at least 5-10 times and report median, p90, and min/max for TTFT, prefill tok/s, decode tok/s, peak RAM, load time, and battery drain.
 
-Fourth, I would repeat every row at least 5-10 times and report median, p90, and min/max for TTFT, prefill tok/s, decode tok/s, peak RAM, load time, and battery drain.
+Fourth, I would improve completion handling. For benchmark comparability, a fixed output token cap is useful. For answer quality, the app should also record whether generation ended naturally or stopped because the output token limit was reached.
 
-Fifth, I would add stronger sustained-load reporting for battery and thermal behavior. The SmolLM2 Q8 10-generation run shows that the energy cost can become the main result, so the next report should include battery temperature, thermal status over time, and whether Android throttled the workload.
-
-Sixth, I would improve completion handling. For benchmark comparability, a fixed output token cap is useful. For answer quality, the app should also record whether generation ended naturally or stopped because the output token limit was reached.
-
-Seventh, I would continue validating ONNX Runtime. The first-token numbers are strong, but I would check generated text quality, tokenizer correctness, NNAPI fallback behavior, and whether ONNX still wins after repeated warm and cold runs.
+Fifth, I would continue validating ONNX Runtime. The first-token numbers are strong, but I would check generated text quality, tokenizer correctness, NNAPI fallback behavior, and whether ONNX still wins after repeated warm and cold runs.
 
 ## 1. Goal
 
