@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "defaults": {
+    "condition": "NORMAL_COLD",
+    "promptId": "P001",
+    "prompt": "Explain how an Android application can benchmark an on-device language model. Include the role of prefill throughput, decode throughput, time to first token, model load time, app memory, battery drain, and thermal status. Keep the answer practical and focused on reproducible measurements.",
+    "consecutiveGenerations": 1,
+    "ramSamplingIntervalSeconds": 5,
+    "temperature": 0.7,
+    "topK": 40,
+    "topP": 0.9,
+    "seed": 42
+  },
+  "presets": [
+    {
+      "engineType": "LLAMA_CPP",
+      "modelName": "Qwen2.5-0.5B-Instruct-Q4_K_M",
+      "contextSize": 1024,
+      "maxOutputTokens": 128,
+      "gpuLayers": -1
+    },
+    {
+      "engineType": "LLAMA_CPP",
+      "modelName": "Qwen2.5-0.5B-Instruct-Q8_0",
+      "contextSize": 1024,
+      "maxOutputTokens": 128,
+      "gpuLayers": -1
+    },
+    {
+      "engineType": "LLAMA_CPP",
+      "modelName": "SmolLM2-1.7B-Instruct-Q4_K_M",
+      "contextSize": 512,
+      "maxOutputTokens": 100,
+      "gpuLayers": 16
+    },
+    {
+      "engineType": "LLAMA_CPP",
+      "modelName": "SmolLM2-1.7B-Instruct-Q8_0",
+      "contextSize": 512,
+      "maxOutputTokens": 64,
+      "gpuLayers": 8
+    },
+    {
+      "engineType": "ONNX_RUNTIME",
+      "modelName": "Qwen2.5-0.5B-Instruct-ONNX-Q4",
+      "contextSize": 256,
+      "maxOutputTokens": 64,
+      "gpuLayers": 0
+    },
+    {
+      "engineType": "ONNX_RUNTIME",
+      "modelName": "Qwen2.5-0.5B-Instruct-ONNX-Q8",
+      "contextSize": 256,
+      "maxOutputTokens": 64,
+      "gpuLayers": 0
+    },
+    {
+      "engineType": "ONNX_RUNTIME",
+      "modelName": "SmolLM2-1.7B-Instruct-ONNX-Q4",
+      "contextSize": 256,
+      "maxOutputTokens": 32,
+      "gpuLayers": 0
+    },
+    {
+      "engineType": "ONNX_RUNTIME",
+      "modelName": "SmolLM2-1.7B-Instruct-ONNX-Q8",
+      "contextSize": 256,
+      "maxOutputTokens": 32,
+      "gpuLayers": 0
+    }
+  ]
+}

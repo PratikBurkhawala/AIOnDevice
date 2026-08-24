@@ -54,6 +54,7 @@ internal class LlamaCppEngine : LlmEngine {
                         modelPath = model.filePath,
                         contextSize = model.contextSize,
                         maxOutputTokens = 512,
+                        gpuLayers = model.gpuLayers,
                     )
                 }
             }

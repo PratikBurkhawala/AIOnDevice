@@ -47,6 +47,7 @@ data class ModelConfig(
     val quantization: String = "Q4_K_M",
     val fileSizeBytes: Long? = null,
     val contextSize: Int = 2048,
+    val gpuLayers: Int = -1,
     val downloadUrl: String = "",
     val downloadSizeLabel: String = "",
     val description: String = "",

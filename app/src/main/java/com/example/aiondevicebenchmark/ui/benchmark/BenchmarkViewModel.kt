@@ -2,6 +2,7 @@ package com.example.aiondevicebenchmark.ui.benchmark
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.aiondevicebenchmark.benchmark.BenchmarkCondition
 import com.example.aiondevicebenchmark.benchmark.BenchmarkConfig
 import com.example.aiondevicebenchmark.benchmark.BenchmarkState
 import com.example.aiondevicebenchmark.domain.usecase.DeleteSavedJsonFileUseCase
@@ -12,6 +13,7 @@ import com.example.aiondevicebenchmark.domain.usecase.FindSavedJsonFileUseCase
 import com.example.aiondevicebenchmark.domain.usecase.GetDefaultModelForEngineUseCase
 import com.example.aiondevicebenchmark.domain.usecase.GetModelStorageDirectoryUseCase
 import com.example.aiondevicebenchmark.domain.usecase.GetModelsForEngineUseCase
+import com.example.aiondevicebenchmark.domain.usecase.GetModelParameterPresetUseCase
 import com.example.aiondevicebenchmark.domain.usecase.GetSupportedEnginesUseCase
 import com.example.aiondevicebenchmark.domain.usecase.LocalizeModelUseCase
 import com.example.aiondevicebenchmark.domain.usecase.ListSavedJsonFilesUseCase
@@ -46,6 +48,7 @@ class BenchmarkViewModel(
     private val getSupportedEnginesUseCase: GetSupportedEnginesUseCase,
     private val getModelsForEngineUseCase: GetModelsForEngineUseCase,
     private val getDefaultModelForEngineUseCase: GetDefaultModelForEngineUseCase,
+    private val getModelParameterPresetUseCase: GetModelParameterPresetUseCase,
     private val detectModelQuantizationUseCase: DetectModelQuantizationUseCase,
     private val observeModelDownloadsUseCase: ObserveModelDownloadsUseCase,
     private val refreshModelDownloadsUseCase: RefreshModelDownloadsUseCase,
@@ -54,11 +57,14 @@ class BenchmarkViewModel(
     private val localizeModelUseCase: LocalizeModelUseCase,
     private val getModelStorageDirectoryUseCase: GetModelStorageDirectoryUseCase,
 ) : ViewModel() {
+    private val initialConfig = applyPreset(BenchmarkConfig())
+
     private val _uiState = MutableStateFlow(
         BenchmarkUiState(
+            config = initialConfig,
             supportedEngines = getSupportedEnginesUseCase(),
-            supportedModels = getModelsForEngineUseCase(BenchmarkConfig().engineType),
-            modelStorageDirectory = getModelStorageDirectoryUseCase(BenchmarkConfig().engineType),
+            supportedModels = getModelsForEngineUseCase(initialConfig.engineType),
+            modelStorageDirectory = getModelStorageDirectoryUseCase(initialConfig.engineType),
         ),
     )
     val uiState: StateFlow<BenchmarkUiState> = _uiState.asStateFlow()
@@ -106,13 +112,13 @@ class BenchmarkViewModel(
             BenchmarkUiEvent.ClearMessage -> _uiState.update { it.copy(message = null) }
             is BenchmarkUiEvent.UpdateEngine -> update {
                 val model = getDefaultModelForEngineUseCase(event.value)
-                it.copy(engineType = event.value, model = prepareModel(model))
+                applyPreset(it.copy(engineType = event.value, model = prepareModel(model)))
             }
             is BenchmarkUiEvent.UpdateModel -> update { config ->
                 val model = getModelsForEngineUseCase(config.engineType)
                     .firstOrNull { model -> model.name == event.value }
                     ?: getDefaultModelForEngineUseCase(config.engineType)
-                config.copy(model = prepareModel(model))
+                applyPreset(config.copy(model = prepareModel(model)))
             }
             is BenchmarkUiEvent.UpdateCondition -> update { it.copy(condition = event.value) }
             is BenchmarkUiEvent.UpdatePrompt -> update { it.copy(prompt = event.value) }
@@ -121,6 +127,19 @@ class BenchmarkViewModel(
                 inputSetter = { it.copy(maxOutputTokensInput = event.value) },
             ) { current, intValue ->
                 current.copy(maxOutputTokens = intValue.coerceIn(1, 512))
+            }
+            is BenchmarkUiEvent.UpdateContextSize -> {
+                _uiState.update { current ->
+                    val parsed = event.value.toIntOrNull()?.coerceIn(128, 8192)
+                    current.copy(
+                        contextSizeInput = event.value,
+                        config = if (parsed == null) {
+                            current.config
+                        } else {
+                            current.config.copy(model = current.config.model.copy(contextSize = parsed))
+                        },
+                    )
+                }
             }
             is BenchmarkUiEvent.UpdateConsecutiveGenerations -> {
                 _uiState.update { it.copy(generationsInput = event.value) }
@@ -132,6 +151,19 @@ class BenchmarkViewModel(
                 _uiState.update { it.copy(ramSamplingIntervalInput = event.value) }
                 update {
                     it.copy(ramSamplingIntervalSeconds = event.value.toIntOrNull()?.coerceIn(1, 3600) ?: it.ramSamplingIntervalSeconds)
+                }
+            }
+            is BenchmarkUiEvent.UpdateLlamaGpuLayers -> {
+                _uiState.update { current ->
+                    val parsed = event.value.toIntOrNull()?.coerceIn(-1, 128)
+                    current.copy(
+                        llamaGpuLayersInput = event.value,
+                        config = if (parsed == null) {
+                            current.config
+                        } else {
+                            current.config.copy(model = current.config.model.copy(gpuLayers = parsed))
+                        },
+                    )
                 }
             }
             is BenchmarkUiEvent.UpdateTemperature -> updateGenerationDouble(
@@ -232,7 +264,7 @@ class BenchmarkViewModel(
             !state?.isReady.orFalse() -> "${prepared.name} selected. Download it before benchmarking."
             else -> "${prepared.name} selected for benchmark."
         }
-        update { it.copy(model = prepared) }
+        update { applyPreset(it.copy(model = prepared)) }
         _uiState.update { it.copy(screen = AppScreen.Benchmark, message = message) }
     }
 
@@ -321,12 +353,48 @@ class BenchmarkViewModel(
                 config = config,
                 supportedModels = getModelsForEngineUseCase(config.engineType).map { model -> localizeModelUseCase(model) },
                 modelStorageDirectory = getModelStorageDirectoryUseCase(config.engineType),
+                maxOutputTokensInput = config.generation.maxOutputTokens.toString(),
+                contextSizeInput = config.model.contextSize.toString(),
+                generationsInput = config.consecutiveGenerations.toString(),
+                ramSamplingIntervalInput = config.ramSamplingIntervalSeconds.toString(),
+                llamaGpuLayersInput = config.model.gpuLayers.toString(),
+                temperatureInput = config.generation.temperature.toString(),
+                topKInput = config.generation.topK.toString(),
+                topPInput = config.generation.topP.toString(),
+                seedInput = config.generation.seed.toString(),
             )
         }
     }
 
     private fun prepareModel(model: ModelConfig): ModelConfig {
         return localizeModelUseCase(detectModelQuantizationUseCase(model))
+    }
+
+    private fun applyPreset(config: BenchmarkConfig): BenchmarkConfig {
+        val preset = getModelParameterPresetUseCase(config.model) ?: return config
+        val condition = runCatching {
+            BenchmarkCondition.valueOf(preset.condition)
+        }.getOrElse {
+            config.condition
+        }
+        return config.copy(
+            model = config.model.copy(
+                contextSize = preset.contextSize.coerceIn(128, 8192),
+                gpuLayers = preset.gpuLayers.coerceIn(-1, 128),
+            ),
+            condition = condition,
+            promptId = preset.promptId,
+            prompt = preset.prompt,
+            consecutiveGenerations = preset.consecutiveGenerations.coerceIn(1, 20),
+            ramSamplingIntervalSeconds = preset.ramSamplingIntervalSeconds.coerceIn(1, 3600),
+            generation = config.generation.copy(
+                maxOutputTokens = preset.maxOutputTokens.coerceIn(1, 512),
+                temperature = preset.temperature.coerceIn(0.0, 2.0),
+                topK = preset.topK.coerceIn(1, 200),
+                topP = preset.topP.coerceIn(0.0, 1.0),
+                seed = preset.seed,
+            ),
+        )
     }
 
     private fun updateGenerationInt(

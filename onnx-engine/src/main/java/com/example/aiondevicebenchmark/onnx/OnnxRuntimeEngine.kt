@@ -16,6 +16,8 @@ import com.example.aiondevicebenchmark.llm.ModelConfig
 import com.example.aiondevicebenchmark.llm.TokenizationResult
 import com.example.aiondevicebenchmark.llm.UnloadResult
 import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import java.nio.LongBuffer
 import java.time.Duration
@@ -248,17 +250,22 @@ internal class OnnxRuntimeEngine : LlmEngine {
         if (shape.any { it < 0 }) {
             error("Cannot infer empty KV-cache shape for $name: ${tensorInfo.shape.joinToString(prefix = "[", postfix = "]")}")
         }
-        return floatTensor(env, FloatArray(shape.elementCount()), shape)
+        return OnnxTensor.createTensor(env, directFloatBuffer(shape.elementCount()), shape)
     }
 
     private fun longTensor(env: OrtEnvironment, values: List<Long>, shape: LongArray): OnnxTensor {
         val expected = shape.elementCount()
-        val data = LongArray(expected) { index -> values.getOrElse(index % values.size.coerceAtLeast(1)) { 0L } }
-        return OnnxTensor.createTensor(env, LongBuffer.wrap(data), shape)
+        val data = directLongBuffer(expected)
+        repeat(expected) { index ->
+            data.put(index, values.getOrElse(index % values.size.coerceAtLeast(1)) { 0L })
+        }
+        return OnnxTensor.createTensor(env, data, shape)
     }
 
     private fun floatTensor(env: OrtEnvironment, values: FloatArray, shape: LongArray): OnnxTensor {
-        return OnnxTensor.createTensor(env, FloatBuffer.wrap(values), shape)
+        val data = directFloatBuffer(values.size)
+        values.forEachIndexed { index, value -> data.put(index, value) }
+        return OnnxTensor.createTensor(env, data, shape)
     }
 
     private fun OnnxTensor.copyTensor(env: OrtEnvironment): OnnxTensor {
@@ -267,22 +274,36 @@ internal class OnnxRuntimeEngine : LlmEngine {
         return when (info.type) {
             OnnxJavaType.FLOAT -> {
                 val source = floatBuffer
-                val copy = FloatArray(source.limit())
-                for (index in copy.indices) {
-                    copy[index] = source.get(index)
+                val copy = directFloatBuffer(source.limit())
+                for (index in 0 until source.limit()) {
+                    copy.put(index, source.get(index))
                 }
-                OnnxTensor.createTensor(env, FloatBuffer.wrap(copy), shape)
+                OnnxTensor.createTensor(env, copy, shape)
             }
             OnnxJavaType.INT64 -> {
                 val source = longBuffer
-                val copy = LongArray(source.limit())
-                for (index in copy.indices) {
-                    copy[index] = source.get(index)
+                val copy = directLongBuffer(source.limit())
+                for (index in 0 until source.limit()) {
+                    copy.put(index, source.get(index))
                 }
-                OnnxTensor.createTensor(env, LongBuffer.wrap(copy), shape)
+                OnnxTensor.createTensor(env, copy, shape)
             }
             else -> error("Unsupported tensor copy type ${info.type}")
         }
+    }
+
+    private fun directFloatBuffer(elementCount: Int): FloatBuffer {
+        return ByteBuffer
+            .allocateDirect(elementCount * Float.SIZE_BYTES)
+            .order(ByteOrder.nativeOrder())
+            .asFloatBuffer()
+    }
+
+    private fun directLongBuffer(elementCount: Int): LongBuffer {
+        return ByteBuffer
+            .allocateDirect(elementCount * Long.SIZE_BYTES)
+            .order(ByteOrder.nativeOrder())
+            .asLongBuffer()
     }
 
     private fun OnnxTensor.argmaxLastToken(): Long {

@@ -371,6 +371,12 @@ Prompt
 Max output tokens
   [ 100 ]
 
+Context size
+  [ 1024 ]
+
+GPU layers
+  [ -1 ]
+
 Consecutive generations
   [ 20 ]
 
@@ -391,11 +397,47 @@ Seed
 
 For the primary comparison, keep generation settings fixed.
 
+The app pre-fills these editable fields from `app/src/main/assets/model_parameter_presets.json`. The JSON contains shared defaults plus per-model overrides, and the UI applies them on initial load, engine change, and model change. Users can still edit the values after they are loaded.
+
+Config-backed fields:
+
+```text
+condition
+promptId
+prompt
+contextSize
+maxOutputTokens
+gpuLayers
+consecutiveGenerations
+ramSamplingIntervalSeconds
+temperature
+topK
+topP
+seed
+```
+
+Current model-specific preset values:
+
+| Engine | Model | Context | Max output | GPU layers |
+|---|---|---:|---:|---:|
+| `LLAMA_CPP` | `Qwen2.5-0.5B-Instruct-Q4_K_M` | 1024 | 128 | -1 |
+| `LLAMA_CPP` | `Qwen2.5-0.5B-Instruct-Q8_0` | 1024 | 128 | -1 |
+| `LLAMA_CPP` | `SmolLM2-1.7B-Instruct-Q4_K_M` | 512 | 100 | 16 |
+| `LLAMA_CPP` | `SmolLM2-1.7B-Instruct-Q8_0` | 512 | 64 | 8 |
+| `ONNX_RUNTIME` | `Qwen2.5-0.5B-Instruct-ONNX-Q4` | 256 | 64 | 0 |
+| `ONNX_RUNTIME` | `Qwen2.5-0.5B-Instruct-ONNX-Q8` | 256 | 64 | 0 |
+| `ONNX_RUNTIME` | `SmolLM2-1.7B-Instruct-ONNX-Q4` | 256 | 32 | 0 |
+| `ONNX_RUNTIME` | `SmolLM2-1.7B-Instruct-ONNX-Q8` | 256 | 32 | 0 |
+
 Recommended initial benchmark configuration:
 
 ```text
-Prompt:              fixed 600-token prompt
-Max output tokens:   100
+Model:               Qwen2.5-0.5B-Instruct-Q4_K_M
+Context size:        1024
+Max output tokens:   128
+GPU layers:          -1
+Generations:         1
+RAM sample sec:      5
 Temperature:         0.7
 Top-K:               40
 Top-P:               0.9

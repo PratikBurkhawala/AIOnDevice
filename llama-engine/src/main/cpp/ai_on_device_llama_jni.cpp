@@ -311,14 +311,16 @@ static LoadedSession try_load_session(
     const std::string & model_path,
     const uint32_t n_ctx,
     const uint32_t n_batch,
+    const uint32_t n_ubatch,
     const int threads,
-    const bool prefer_gpu,
+    const int gpu_layers,
     ggml_backend_dev_t gpu_device
 ) {
     llama_model_params model_params = llama_model_default_params();
-    model_params.n_gpu_layers = prefer_gpu ? -1 : 0;
+    model_params.n_gpu_layers = gpu_layers < 0 ? -1 : gpu_layers;
+    model_params.load_mode = LLAMA_LOAD_MODE_MMAP;
     std::vector<ggml_backend_dev_t> devices;
-    if (prefer_gpu && gpu_device) {
+    if (model_params.n_gpu_layers != 0 && gpu_device) {
         devices.push_back(gpu_device);
         devices.push_back(nullptr);
         model_params.devices = devices.data();
@@ -339,9 +341,10 @@ static LoadedSession try_load_session(
     llama_context_params ctx_params = llama_context_default_params();
     ctx_params.n_ctx = n_ctx;
     ctx_params.n_batch = n_batch;
-    ctx_params.n_ubatch = n_batch;
+    ctx_params.n_ubatch = n_ubatch;
     ctx_params.n_threads = threads;
     ctx_params.n_threads_batch = threads;
+    ctx_params.offload_kqv = model_params.n_gpu_layers != 0;
     ctx_params.no_perf = false;
     ctx_params.abort_callback = [](void * data) -> bool {
         auto * abort_requested = static_cast<std::atomic_bool *>(data);
@@ -359,7 +362,7 @@ static LoadedSession try_load_session(
     session->ctx = ctx;
     session->vocab = llama_model_get_vocab(model);
     session->threads = llama_n_threads(ctx);
-    return LoadedSession{session, prefer_gpu ? "GPU" : "CPU", session->gpu_layers};
+    return LoadedSession{session, model_params.n_gpu_layers != 0 ? "GPU" : "CPU", session->gpu_layers};
 }
 
 } // namespace
@@ -370,7 +373,8 @@ Java_com_example_aiondevicebenchmark_llama_NativeLlamaBridge_loadModel(
     jobject,
     jstring j_model_path,
     jint context_size,
-    jint max_output_tokens
+    jint max_output_tokens,
+    jint requested_gpu_layers
 ) {
     try {
         std::call_once(g_backend_once, [] {
@@ -393,27 +397,40 @@ Java_com_example_aiondevicebenchmark_llama_NativeLlamaBridge_loadModel(
         const int prompt_capacity = std::max(1, context_size);
         const int prediction_capacity = std::max(1, max_output_tokens);
         const uint32_t n_ctx = static_cast<uint32_t>(std::max(prompt_capacity, prompt_capacity + prediction_capacity));
-        const uint32_t n_batch = n_ctx;
+        const uint32_t n_batch = std::min<uint32_t>(n_ctx, 256);
+        const uint32_t n_ubatch = std::min<uint32_t>(n_batch, 128);
         const int threads = std::max(1, static_cast<int>(std::thread::hardware_concurrency()));
+        const int gpu_layers = requested_gpu_layers < 0 ? -1 : requested_gpu_layers;
+
+        LOGI(
+            "llama.cpp load config: n_ctx=%u n_batch=%u n_ubatch=%u threads=%d gpu_layers=%d",
+            n_ctx,
+            n_batch,
+            n_ubatch,
+            threads,
+            gpu_layers
+        );
 
         const GpuBackendInfo gpu = find_gpu_backend();
         LoadedSession loaded{};
         std::string backend = "CPU";
-        if (gpu.available) {
+        if (gpu.available && gpu_layers != 0) {
             LOGI("llama.cpp GPU backend available: %s", gpu.name.c_str());
-            loaded = try_load_session(model_path, n_ctx, n_batch, threads, true, gpu.device);
+            loaded = try_load_session(model_path, n_ctx, n_batch, n_ubatch, threads, gpu_layers, gpu.device);
             if (loaded.session) {
                 backend = "GPU: " + gpu.name;
             } else {
                 LOGE("llama.cpp GPU load failed; falling back to CPU. %s", gpu.diagnostics.c_str());
             }
+        } else if (gpu.available) {
+            LOGI("llama.cpp GPU backend available but disabled for this model: %s", gpu.name.c_str());
         } else {
             LOGI("llama.cpp GPU backend unavailable; using CPU. %s", gpu.diagnostics.c_str());
         }
 
         if (!loaded.session) {
-            loaded = try_load_session(model_path, n_ctx, n_batch, threads, false, nullptr);
-            backend = gpu.available
+            loaded = try_load_session(model_path, n_ctx, n_batch, n_ubatch, threads, 0, nullptr);
+            backend = gpu.available && gpu_layers != 0
                 ? "CPU (GPU fallback: " + gpu.name + ")"
                 : "CPU (GPU unavailable)";
         }

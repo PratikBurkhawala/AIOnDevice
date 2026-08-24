@@ -309,9 +309,11 @@ Engine                 llama.cpp or ONNX Runtime
 Model                  Model from the current engine catalog
 Quantization           Read-only value from selected model metadata
 Local model path       Read-only path after a downloaded model is selected
+GPU layers             llama.cpp only: -1 all GPU layers, 0 CPU, positive value partial GPU offload
 Condition              Label for the test condition
 Prompt                 Prompt text used for generation
 Max output             Target generated token count
+Context size           Number of tokens the runtime can keep in the prompt + generated response window
 Generations            Number of consecutive generations in the run group
 RAM sample sec         RAM sampling interval during load/inference/unload
 Temperature            Sampling temperature
@@ -320,15 +322,61 @@ Top-P                  Sampling top-p
 Seed                   Runtime seed
 ```
 
-Recommended first benchmark:
+The visible input fields are pre-filled from `app/src/main/assets/model_parameter_presets.json`. The file has shared `defaults` and per-model `presets`; the app resolves them when the benchmark screen first loads, when the engine changes, and when the selected model changes. Users can still edit the UI fields after they are loaded from the file.
+
+Config-backed fields:
+
+```text
+condition
+promptId
+prompt
+contextSize
+maxOutputTokens
+gpuLayers
+consecutiveGenerations
+ramSamplingIntervalSeconds
+temperature
+topK
+topP
+seed
+```
+
+Current model-specific preset values:
+
+| Engine | Model | Context | Max output | GPU layers |
+| --- | --- | ---: | ---: | ---: |
+| `LLAMA_CPP` | `Qwen2.5-0.5B-Instruct-Q4_K_M` | 1024 | 128 | -1 |
+| `LLAMA_CPP` | `Qwen2.5-0.5B-Instruct-Q8_0` | 1024 | 128 | -1 |
+| `LLAMA_CPP` | `SmolLM2-1.7B-Instruct-Q4_K_M` | 512 | 100 | 16 |
+| `LLAMA_CPP` | `SmolLM2-1.7B-Instruct-Q8_0` | 512 | 64 | 8 |
+| `ONNX_RUNTIME` | `Qwen2.5-0.5B-Instruct-ONNX-Q4` | 256 | 64 | 0 |
+| `ONNX_RUNTIME` | `Qwen2.5-0.5B-Instruct-ONNX-Q8` | 256 | 64 | 0 |
+| `ONNX_RUNTIME` | `SmolLM2-1.7B-Instruct-ONNX-Q4` | 256 | 32 | 0 |
+| `ONNX_RUNTIME` | `SmolLM2-1.7B-Instruct-ONNX-Q8` | 256 | 32 | 0 |
+
+Shared default preset values:
+
+```text
+Condition:             Normal / Cold
+Generations:           1
+RAM sample sec:        5
+Temperature:           0.7
+Top-K:                 40
+Top-P:                 0.9
+Seed:                  42
+```
+
+Recommended first benchmark is the default preset for the smallest llama.cpp model:
 
 ```text
 Engine:                llama.cpp
 Model:                 Qwen2.5-0.5B-Instruct-Q4_K_M
 Condition:             Normal / Cold
-Max output:            100
+Context size:          1024
+Max output:            128
+GPU layers:            -1
 Generations:           1
-RAM sample sec:        5 or 10 for short runs
+RAM sample sec:        5
 Temperature:           0.7
 Top-K:                 40
 Top-P:                 0.9

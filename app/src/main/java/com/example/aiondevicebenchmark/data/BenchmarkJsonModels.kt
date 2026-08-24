@@ -124,6 +124,7 @@ data class ModelJson(
     val quantization: String,
     val fileSizeBytes: Long?,
     val contextSize: Int,
+    val gpuLayers: Int,
     val maxOutputTokens: Int,
 ) {
     companion object {
@@ -139,6 +140,7 @@ data class ModelJson(
                 quantization = model.quantization,
                 fileSizeBytes = fileSize,
                 contextSize = model.contextSize,
+                gpuLayers = model.gpuLayers,
                 maxOutputTokens = maxOutputTokens,
             )
         }

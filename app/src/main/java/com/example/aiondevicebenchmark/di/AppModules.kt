@@ -6,6 +6,7 @@ import com.example.aiondevicebenchmark.benchmark.BenchmarkRunner
 import com.example.aiondevicebenchmark.data.CrashReportStore
 import com.example.aiondevicebenchmark.data.JsonRepository
 import com.example.aiondevicebenchmark.data.ModelDownloadRepositoryImpl
+import com.example.aiondevicebenchmark.data.ModelParameterPresetRepository
 import com.example.aiondevicebenchmark.domain.repository.BenchmarkResultRepository
 import com.example.aiondevicebenchmark.domain.repository.ModelDownloadRepository
 import com.example.aiondevicebenchmark.domain.usecase.DeleteSavedJsonFileUseCase
@@ -16,6 +17,7 @@ import com.example.aiondevicebenchmark.domain.usecase.FindSavedJsonFileUseCase
 import com.example.aiondevicebenchmark.domain.usecase.GetDefaultModelForEngineUseCase
 import com.example.aiondevicebenchmark.domain.usecase.GetModelStorageDirectoryUseCase
 import com.example.aiondevicebenchmark.domain.usecase.GetModelsForEngineUseCase
+import com.example.aiondevicebenchmark.domain.usecase.GetModelParameterPresetUseCase
 import com.example.aiondevicebenchmark.domain.usecase.GetSupportedEnginesUseCase
 import com.example.aiondevicebenchmark.domain.usecase.LocalizeModelUseCase
 import com.example.aiondevicebenchmark.domain.usecase.ListSavedJsonFilesUseCase
@@ -61,6 +63,7 @@ val appModule = module {
     single { BackgroundWorkTracker(androidContext()) }
     single { TelemetryCollector(androidContext()) }
     single { CrashReportStore(androidContext()) }
+    single { ModelParameterPresetRepository(androidContext()) }
     single<BenchmarkResultRepository> { JsonRepository(androidContext()) }
     single<ModelDownloadRepository> { ModelDownloadRepositoryImpl(androidContext(), get(), get()) }
 
@@ -79,6 +82,7 @@ val appModule = module {
     factory { GetSupportedEnginesUseCase(engineCatalog = get()) }
     factory { GetModelsForEngineUseCase(engineCatalog = get()) }
     factory { GetDefaultModelForEngineUseCase(engineCatalog = get()) }
+    factory { GetModelParameterPresetUseCase(repository = get()) }
     factory { DetectModelQuantizationUseCase(engineCatalog = get()) }
     factory { ObserveModelDownloadsUseCase(repository = get()) }
     factory { RefreshModelDownloadsUseCase(repository = get()) }
@@ -101,6 +105,7 @@ val appModule = module {
             getSupportedEnginesUseCase = get(),
             getModelsForEngineUseCase = get(),
             getDefaultModelForEngineUseCase = get(),
+            getModelParameterPresetUseCase = get(),
             detectModelQuantizationUseCase = get(),
             observeModelDownloadsUseCase = get(),
             refreshModelDownloadsUseCase = get(),

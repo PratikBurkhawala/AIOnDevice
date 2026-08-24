@@ -9,6 +9,7 @@ internal object NativeLlamaBridge {
         modelPath: String,
         contextSize: Int,
         maxOutputTokens: Int,
+        gpuLayers: Int,
     ): Triple<Boolean, String, NativeLoadResult?>
 
     external fun unloadModel(handle: Long): Triple<Boolean, String, Long?>

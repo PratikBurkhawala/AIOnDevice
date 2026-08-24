@@ -94,6 +94,16 @@ private fun BenchmarkConfigScreen(
             label = { Text("Local model path") },
         )
         KeyValueRow("Acceleration", "llama.cpp uses Vulkan GPU when available. ONNX Runtime tries NNAPI and otherwise uses CPU.")
+        if (config.engineType == EngineType.LLAMA_CPP) {
+            NumericField(
+                "GPU layers (-1 all, 0 CPU)",
+                state.llamaGpuLayersInput,
+                enabled,
+                { onEvent(BenchmarkUiEvent.UpdateLlamaGpuLayers(it)) },
+                Modifier.fillMaxWidth(),
+                KeyboardType.Text,
+            )
+        }
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Condition", style = MaterialTheme.typography.labelLarge)
@@ -121,9 +131,10 @@ private fun BenchmarkConfigScreen(
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             NumericField("Max output", state.maxOutputTokensInput, enabled, { onEvent(BenchmarkUiEvent.UpdateMaxOutputTokens(it)) }, Modifier.weight(1f))
-            NumericField("Generations", state.generationsInput, enabled, { onEvent(BenchmarkUiEvent.UpdateConsecutiveGenerations(it)) }, Modifier.weight(1f))
+            NumericField("Context size", state.contextSizeInput, enabled, { onEvent(BenchmarkUiEvent.UpdateContextSize(it)) }, Modifier.weight(1f))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            NumericField("Generations", state.generationsInput, enabled, { onEvent(BenchmarkUiEvent.UpdateConsecutiveGenerations(it)) }, Modifier.weight(1f))
             NumericField("RAM sample sec", state.ramSamplingIntervalInput, enabled, { onEvent(BenchmarkUiEvent.UpdateRamSamplingInterval(it)) }, Modifier.weight(1f))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
