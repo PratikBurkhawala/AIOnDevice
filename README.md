@@ -11,6 +11,7 @@ The app is a practical benchmark harness, not a UI-heavy demo. It is intended to
 - provide an experimental ONNX Runtime path for comparison work;
 - measure model load time, prompt tokenization, TTFT, prefill throughput, decode throughput, peak RAM, battery drain, and thermal status;
 - record selected device conditions such as cold run, sustained load, battery saver, memory pressure, hot phone, and background run;
+- keep long downloads and benchmark runs alive through a foreground background-work service;
 - save structured JSON results and export table-form CSV reports;
 - capture crash reports when native or runtime failures happen.
 
@@ -38,6 +39,12 @@ The app is a practical benchmark harness, not a UI-heavy demo. It is intended to
                                    v
                         +---------------------+
                         | BenchmarkController |
+                        +----------+----------+
+                                   |
+                                   v
+                        +---------------------+
+                        | BackgroundWork      |
+                        | foreground service  |
                         +----------+----------+
                                    |
                     +--------------+--------------+
@@ -106,6 +113,7 @@ The app is a practical benchmark harness, not a UI-heavy demo. It is intended to
 | BenchmarkRunner                                             |
 | BenchmarkConfig                                             |
 | BenchmarkState                                              |
+| BackgroundWorkTracker / BackgroundWorkService               |
 +--------------+------------------------------+---------------+
                |                              |
                v                              v
@@ -143,7 +151,8 @@ The key rule is that `BenchmarkRunner` does not know about `llama.cpp`, ONNX, or
 ```text
 :app
   Android application, Compose UI, Koin wiring, benchmark orchestration,
-  telemetry, model downloads, JSON persistence, CSV sharing, crash capture.
+  foreground background-work service, telemetry, model downloads,
+  JSON persistence, CSV sharing, crash capture.
 
 :engine
   Runtime-neutral contracts and catalog:
@@ -229,6 +238,12 @@ Download behavior:
 - ONNX generation requires both the `.onnx` file and the tokenizer JSON.
 - The app currently does not implement a persistent background resume queue such as WorkManager.
 
+Benchmark behavior:
+
+- Benchmark runs are also wrapped by `BackgroundWorkTracker`.
+- While a benchmark is active, `BackgroundWorkService` runs as a foreground service with an ongoing notification.
+- Native engine load/generation/unload work is dispatched away from the UI thread; the UI observes progress through benchmark state updates.
+
 ## 7. Setup
 
 ### Host Requirements
@@ -241,6 +256,7 @@ Download behavior:
 - CMake `3.22.1`.
 - USB debugging enabled on an Android device.
 - An `arm64-v8a` device for native llama.cpp runs.
+- Foreground-service permission support on the target device. The manifest declares `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_DATA_SYNC`.
 
 ### Clone and Prepare
 
@@ -353,6 +369,10 @@ Use this tab to:
 
 Use this tab to inspect native or JVM crash reports captured by `CrashReportStore`. On Android 11 and newer, the app also reads recent historical process exit reasons for native crashes.
 
+### Background Execution
+
+Model downloads and benchmark runs are tracked as background work. The app starts `BackgroundWorkService` as a foreground service with a persistent notification while that work is active, then stops it when all tracked work finishes. This allows long downloads and active benchmark runs to continue when the app is not the foreground screen, subject to Android foreground-service and device power-management rules.
+
 ## 9. Benchmark Flow
 
 ```text
@@ -363,6 +383,9 @@ Validate local model path
           |
           v
 Capture run start device/battery/RAM state
+          |
+          v
+Start foreground background-work service
           |
           v
 Create selected LlmEngine
@@ -403,6 +426,9 @@ Capture run end battery/thermal state
           |
           v
 Write grouped JSON file
+          |
+          v
+Stop foreground service
 ```
 
 The current implementation writes one grouped JSON file per benchmark run group. Each file contains a list of per-generation `inferenceRuns` plus run-level summary data. The repository can still read older one-record and legacy grouped JSON formats.
