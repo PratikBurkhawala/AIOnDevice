@@ -2,6 +2,117 @@
 
 Android benchmark app for running small LLMs on-device, collecting repeatable performance and telemetry data, and comparing engines, models, quantizations, prompts, and device conditions.
 
+## Benchmark Submission Report
+
+The results below come from the checked-in `report.csv`. The device used for these runs was Samsung `SM-A176B`. The `llama.cpp` runs reported a Vulkan GPU backend on `Mali-G68`; the ONNX runs reported `ONNX Runtime NNAPI`.
+
+### Setup Summary
+
+- Android app package: `com.example.aiondevicebenchmark`
+- Root project: `AiOnDeviceBenchmark`
+- Main runtime paths: native `llama.cpp` GGUF and ONNX Runtime Android
+- Android SDK: `compileSdk = 34`, `minSdk = 28`, `targetSdk = 34`
+- Java/Kotlin target: 17
+- Gradle wrapper: Gradle 8.13
+- Native ABI: `arm64-v8a`
+- Native build: Android NDK `27.0.12077973`, CMake `3.22.1`, C++17
+- `llama.cpp` Vulkan support: `GGML_VULKAN=ON`
+
+Build and install from the repo root:
+
+```bash
+./gradlew assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+The APK does not bundle model weights. Models are downloaded from the app's `Models` screen into app external storage, then selected for a benchmark run.
+
+The benchmark runner loads the selected model once, tokenizes the prompt, runs all configured consecutive generations while keeping the model loaded, samples app memory, collects battery and thermal snapshots, unloads the model once after the generation loop completes, and writes structured JSON results. This matters for the 10-generation rows: load time is paid once for the benchmark group, not once per generation.
+
+Default generation settings in code:
+
+| Setting | Value |
+| --- | --- |
+| Max output tokens | 100 |
+| Temperature | 0.7 |
+| Top K | 40 |
+| Top P | 0.9 |
+| Seed | 42 |
+| GGUF context size | 2048 |
+| GGUF GPU layers | `-1`, offload as much as the backend accepts |
+| GGUF CPU threads | `0`, runtime/default thread choice |
+
+### Results
+
+| Generations | Model | Quant | Runtime | Backend | Prefill tok/s | Decode tok/s | TTFT | Peak RAM | Battery drain | Load time | Condition |
+| ---: | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 10 | Qwen2.5-0.5B-Instruct | Q4_K_M | llama.cpp | GPU: Mali-G68 | 4.64 | 2.52 | 65.125 s | 798 MB | 4% | 0.696 s | SUSTAINED_LOAD |
+| 1 | Qwen2.5-0.5B-Instruct | Q4_K_M | llama.cpp | GPU: Mali-G68 | 4.77 | 2.59 | 63.264 s | 768 MB | 1% | 2.718 s | MEMORY_PRESSURE |
+| 1 | Qwen2.5-0.5B-Instruct | Q4_K_M | llama.cpp | GPU: Mali-G68 | 4.55 | 2.19 | 66.398 s | 110 MB | 0% | 0.984 s | BATTERY_SAVER |
+| 1 | Qwen2.5-0.5B-Instruct | Q4_K_M | llama.cpp | GPU: Mali-G68 | 4.77 | 2.61 | 63.304 s | 118 MB | 0% | 0.723 s | BACKGROUND |
+| 1 | Qwen2.5-0.5B-Instruct | Q4_K_M | llama.cpp | GPU: Mali-G68 | 4.64 | 2.58 | 65.083 s | 118 MB | 0% | 1.622 s | NORMAL_COLD |
+| 10 | Qwen2.5-0.5B-Instruct | Q8_0 | llama.cpp | GPU: Mali-G68 | 3.48 | 2.51 | 27.862 s | 908 MB | 3% | 0.836 s | SUSTAINED_LOAD |
+| 1 | Qwen2.5-0.5B-Instruct | Q8_0 | llama.cpp | GPU: Mali-G68 | 4.62 | 2.52 | 65.362 s | 129 MB | 1% | 2.265 s | BACKGROUND |
+| 1 | Qwen2.5-0.5B-Instruct | Q8_0 | llama.cpp | GPU: Mali-G68 | 4.63 | 2.19 | 65.244 s | 113 MB | 1% | 2.355 s | BATTERY_SAVER |
+| 1 | Qwen2.5-0.5B-Instruct | Q8_0 | llama.cpp | GPU: Mali-G68 | 4.61 | 2.57 | 65.448 s | 119 MB | 0% | 2.217 s | SUSTAINED_LOAD |
+| 1 | Qwen2.5-0.5B-Instruct | Q8_0 | llama.cpp | GPU: Mali-G68 | 4.53 | 2.70 | 86.229 s | 116 MB | 1% | 1.020 s | NORMAL_COLD |
+| 1 | SmolLM2-1.7B-Instruct | Q4_K_M | llama.cpp | GPU: Mali-G68 | 1.28 | 0.61 | 270.028 s | 1332 MB | 0% | 3.425 s | NORMAL_COLD |
+| 1 | SmolLM2-1.7B-Instruct | Q4_K_M | llama.cpp | GPU: Mali-G68 | 1.32 | 0.67 | 262.343 s | 1776 MB | 1% | 3.739 s | BACKGROUND |
+| 1 | SmolLM2-1.7B-Instruct | Q8_0 | llama.cpp | GPU: Mali-G68 | 1.17 | 0.40 | 278.583 s | 2074 MB | 2% | 5.805 s | MEMORY_PRESSURE |
+| 1 | SmolLM2-1.7B-Instruct | Q8_0 | llama.cpp | GPU: Mali-G68 | 1.15 | 0.39 | 282.600 s | 2079 MB | 1% | 6.255 s | BATTERY_SAVER |
+| 1 | SmolLM2-1.7B-Instruct | Q8_0 | llama.cpp | GPU: Mali-G68 | 1.11 | 0.57 | 348.426 s | 2676 MB | 2% | 4.497 s | NORMAL_COLD |
+| 1 | Qwen2.5-0.5B-Instruct | Q4 | ONNX Runtime | ONNX Runtime NNAPI | 32.30 | 2.52 | 5.610 s | 142 MB | 0% | 7.674 s | NORMAL_COLD |
+| 1 | Qwen2.5-0.5B-Instruct | Q8 | ONNX Runtime | ONNX Runtime NNAPI | 39.28 | 1.60 | 4.630 s | 125 MB | 0% | 4.695 s | NORMAL_COLD |
+
+Summary:
+
+| Model / Runtime | Rows | Avg prefill tok/s | Avg decode tok/s | Avg TTFT | Avg peak RAM | Avg load time |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Qwen2.5 0.5B Q4_K_M / llama.cpp | 5 | 4.67 | 2.50 | 64.63 s | 382 MB | 1.35 s |
+| Qwen2.5 0.5B Q8_0 / llama.cpp | 5 | 4.38 | 2.50 | 62.03 s | 277 MB | 1.74 s |
+| SmolLM2 1.7B Q4_K_M / llama.cpp | 2 | 1.30 | 0.64 | 266.19 s | 1554 MB | 3.58 s |
+| SmolLM2 1.7B Q8_0 / llama.cpp | 3 | 1.15 | 0.45 | 303.20 s | 2276 MB | 5.52 s |
+| Qwen2.5 0.5B Q4 / ONNX Runtime | 1 | 32.30 | 2.52 | 5.61 s | 142 MB | 7.67 s |
+| Qwen2.5 0.5B Q8 / ONNX Runtime | 1 | 39.28 | 1.60 | 4.63 s | 125 MB | 4.70 s |
+
+### What Surprised Me and Explanation
+
+**Surprise: ONNX reached the first token much faster than llama.cpp for Qwen2.5 0.5B.** The ONNX NNAPI Qwen rows reached TTFT in 4.630-5.610 seconds, while the llama.cpp Qwen rows were mostly around 63-66 seconds, with one normal-cold Q8 row at 86.229 seconds and one 10-generation Q8 sustained row at 27.862 seconds. My explanation is that the ONNX path is getting a better first-token path on this device for this model, probably because NNAPI is handling the initial graph execution more efficiently than the current llama.cpp Vulkan setup. Decode was not always better on ONNX: Qwen ONNX Q4 decode was similar to llama.cpp Qwen decode, while ONNX Q8 decode was slower.
+
+**Surprise: the app and even the system felt slow before the first token, then behaved normally after the first token appeared.** My explanation is that prefill is the heavy phase. Before the first token, the runtime is processing the whole prompt and preparing model state. On the GPU/Vulkan path this can compete with Android rendering and compositor work, which makes the UI feel slow. After prefill completes, decode becomes smaller repeated token steps, so the UI becomes responsive again.
+
+**Surprise: GPU acceleration did not automatically mean better user experience.** Running on GPU can improve some compute paths, but it can also compete with the UI because Android itself needs GPU time for rendering. A CPU-only or partial-offload run may feel smoother for the UI if CPU threads are capped and at least one or two cores are left free. It is not guaranteed, because saturating all CPU cores can also make the UI slow. The practical next step is to expose CPU threads and GPU layers in the UI and test the same prompt under different CPU/GPU splits.
+
+**Surprise: model configuration mattered as much as model choice.** Context size, GPU layer count, CPU thread count, output token limit, and runtime backend all affected whether the model ran reliably. Giving larger values to a model can crash or stall the run, especially on a memory-constrained phone. My explanation is that each increase raises memory pressure and runtime scheduling cost. The app needs conservative defaults per model, then UI controls to tune them intentionally.
+
+**Surprise: the answer can stop incomplete when the output token limit is reached.** The benchmark currently has a max output token setting, defaulting to 100. If the model has not finished its response by that cap, generation stops and the answer remains incomplete. The output token count is therefore not automatically determined by answer completeness; it is a benchmark parameter. For reporting, that is useful because runs are comparable, but for user-facing answers it needs a larger cap or stop-condition handling.
+
+**Surprise: Q4 was not always faster in every metric.** I expected Q4 to be consistently faster than Q8 because it moves less data. That held for SmolLM2 decode and memory, but Qwen Q8 had a much lower TTFT in the 10-generation sustained row. My explanation is that the single metric is affected by backend scheduling, cache state, run condition, and prompt processing, not only quantization. More repeated runs are needed before making a strong Q4-vs-Q8 claim.
+
+**Surprise: SmolLM2 1.7B was much heavier than Qwen2.5 0.5B on the same device.** SmolLM2 decode was around 0.39-0.67 tok/s, while Qwen llama.cpp decode was around 2.19-2.70 tok/s. My explanation is straightforward: the larger model needs more memory movement and compute per token. This is the clearest trend in the data.
+
+### What I Couldn't Get Working
+
+The ONNX path is now producing benchmark rows, but I still consider it experimental because the app reports `EXPERIMENTAL_TOKENIZER_JSON`. I would not treat ONNX output quality or tokenizer behavior as fully validated yet.
+
+I also do not yet have a CPU-only baseline for the same prompts and models. The current llama.cpp rows use the reported Mali-G68 GPU backend, so I cannot prove from this report alone whether CPU, GPU, or partial offload gives the best balance of speed and UI responsiveness.
+
+I did not capture enough repeated runs per exact configuration to separate stable behavior from run-order effects, cache state, thermal state, or Android background activity. The 10-generation rows help, but a stronger report needs repeated trials under the same condition.
+
+### What I'd Try Next With Another Week
+
+First, I would add explicit CPU/GPU controls to the UI: CPU thread count, GPU layer count, context size, and output token cap. Then I would run the same prompt across CPU-only, GPU-only or max-offload, and partial-offload configurations.
+
+Second, I would measure UI responsiveness during inference, not only model throughput. The key question is whether CPU-only with capped threads gives a smoother app than GPU offload during the prefill phase.
+
+Third, I would build a safer default-configuration table per model. Smaller Qwen models can start with more aggressive defaults, while larger SmolLM2 models need more conservative context and output settings to avoid crashes or long stalls.
+
+Fourth, I would repeat every row at least 5-10 times and report median, p90, and min/max for TTFT, prefill tok/s, decode tok/s, peak RAM, load time, and battery drain.
+
+Fifth, I would improve completion handling. For benchmark comparability, a fixed output token cap is useful. For answer quality, the app should also record whether generation ended naturally or stopped because the output token limit was reached.
+
+Sixth, I would continue validating ONNX Runtime. The first-token numbers are strong, but I would check generated text quality, tokenizer correctness, NNAPI fallback behavior, and whether ONNX still wins after repeated warm and cold runs.
+
 ## 1. Goal
 
 The app is a practical benchmark harness, not a UI-heavy demo. It is intended to:
