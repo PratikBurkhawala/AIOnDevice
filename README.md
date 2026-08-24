@@ -309,6 +309,7 @@ Engine                 llama.cpp or ONNX Runtime
 Model                  Model from the current engine catalog
 Quantization           Read-only value from selected model metadata
 Local model path       Read-only path after a downloaded model is selected
+CPU threads            llama.cpp only: 0 uses the app's auto resolver; positive values request that many CPU worker threads
 GPU layers             llama.cpp only: -1 all GPU layers, 0 CPU, positive value partial GPU offload
 Condition              Label for the test condition
 Prompt                 Prompt text used for generation
@@ -332,6 +333,7 @@ promptId
 prompt
 contextSize
 maxOutputTokens
+cpuThreads
 gpuLayers
 consecutiveGenerations
 ramSamplingIntervalSeconds
@@ -341,18 +343,33 @@ topP
 seed
 ```
 
+What the pre-filled input values mean:
+
+| Input | Meaning |
+| --- | --- |
+| `condition` | Run label stored with the result; it does not force phone state by itself. |
+| `promptId` | Identifier stored with the selected prompt for comparing repeated runs. |
+| `prompt` | Text sent to the engine after any engine-specific prompt formatting. |
+| `contextSize` | Token window for input prompt plus generated output. |
+| `maxOutputTokens` | Target number of generated tokens. |
+| `cpuThreads` | llama.cpp CPU worker-thread request; `0` means auto, which leaves some cores free. |
+| `gpuLayers` | llama.cpp GPU offload request; `-1` all possible layers, `0` CPU only, positive values partial offload. |
+| `consecutiveGenerations` | Number of back-to-back generations saved in one run group. |
+| `ramSamplingIntervalSeconds` | Delay between RAM samples during load, inference, and unload. |
+| `temperature`, `topK`, `topP`, `seed` | Sampling settings passed to generation. |
+
 Current model-specific preset values:
 
-| Engine | Model | Context | Max output | GPU layers |
-| --- | --- | ---: | ---: | ---: |
-| `LLAMA_CPP` | `Qwen2.5-0.5B-Instruct-Q4_K_M` | 1024 | 128 | -1 |
-| `LLAMA_CPP` | `Qwen2.5-0.5B-Instruct-Q8_0` | 1024 | 128 | -1 |
-| `LLAMA_CPP` | `SmolLM2-1.7B-Instruct-Q4_K_M` | 512 | 100 | 16 |
-| `LLAMA_CPP` | `SmolLM2-1.7B-Instruct-Q8_0` | 512 | 64 | 8 |
-| `ONNX_RUNTIME` | `Qwen2.5-0.5B-Instruct-ONNX-Q4` | 256 | 64 | 0 |
-| `ONNX_RUNTIME` | `Qwen2.5-0.5B-Instruct-ONNX-Q8` | 256 | 64 | 0 |
-| `ONNX_RUNTIME` | `SmolLM2-1.7B-Instruct-ONNX-Q4` | 256 | 32 | 0 |
-| `ONNX_RUNTIME` | `SmolLM2-1.7B-Instruct-ONNX-Q8` | 256 | 32 | 0 |
+| Engine | Model | Context | Max output | CPU threads | GPU layers |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `LLAMA_CPP` | `Qwen2.5-0.5B-Instruct-Q4_K_M` | 1024 | 128 | 0 | -1 |
+| `LLAMA_CPP` | `Qwen2.5-0.5B-Instruct-Q8_0` | 1024 | 128 | 0 | -1 |
+| `LLAMA_CPP` | `SmolLM2-1.7B-Instruct-Q4_K_M` | 512 | 100 | 0 | 16 |
+| `LLAMA_CPP` | `SmolLM2-1.7B-Instruct-Q8_0` | 512 | 64 | 0 | 8 |
+| `ONNX_RUNTIME` | `Qwen2.5-0.5B-Instruct-ONNX-Q4` | 256 | 64 | 0 | 0 |
+| `ONNX_RUNTIME` | `Qwen2.5-0.5B-Instruct-ONNX-Q8` | 256 | 64 | 0 | 0 |
+| `ONNX_RUNTIME` | `SmolLM2-1.7B-Instruct-ONNX-Q4` | 256 | 32 | 0 | 0 |
+| `ONNX_RUNTIME` | `SmolLM2-1.7B-Instruct-ONNX-Q8` | 256 | 32 | 0 | 0 |
 
 Shared default preset values:
 
@@ -360,6 +377,7 @@ Shared default preset values:
 Condition:             Normal / Cold
 Generations:           1
 RAM sample sec:        5
+CPU threads:           0
 Temperature:           0.7
 Top-K:                 40
 Top-P:                 0.9
@@ -375,6 +393,7 @@ Condition:             Normal / Cold
 Context size:          1024
 Max output:            128
 GPU layers:            -1
+CPU threads:           0
 Generations:           1
 RAM sample sec:        5
 Temperature:           0.7

@@ -9,6 +9,7 @@ internal object NativeLlamaBridge {
         modelPath: String,
         contextSize: Int,
         maxOutputTokens: Int,
+        cpuThreads: Int,
         gpuLayers: Int,
     ): Triple<Boolean, String, NativeLoadResult?>
 

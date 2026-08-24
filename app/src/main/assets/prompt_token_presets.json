@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "presets": [
+    {
+      "tokenTarget": 10,
+      "promptId": "PT010",
+      "prompt": "Summarize on-device AI benchmarking in one sentence."
+    },
+    {
+      "tokenTarget": 50,
+      "promptId": "PT050",
+      "prompt": "Explain how an Android app can benchmark a local language model. Mention model load time, time to first token, prefill speed, decode speed, memory use, battery drain, and thermal state. Keep the answer practical and concise."
+    },
+    {
+      "tokenTarget": 100,
+      "promptId": "PT100",
+      "prompt": "Explain how an Android application can benchmark an on-device language model. Include the role of model loading, prompt tokenization, prefill throughput, time to first token, decode throughput, generated token count, memory sampling, battery drain, screen state, and thermal status. Describe how repeated runs should keep the prompt, sampling settings, model file, quantization, context size, CPU thread count, and GPU layer count fixed so results are comparable."
+    },
+    {
+      "tokenTarget": 250,
+      "promptId": "PT250",
+      "prompt": "Write a practical benchmark plan for testing a small language model directly on an Android phone. Cover preparation, model download, storage location, model load timing, prompt tokenization, prompt prefill, first-token latency, decode throughput, output token count, memory use, battery drain, thermal status, screen state, and repeated generations. Explain why the first run may be slower because file pages, native buffers, GPU drivers, and runtime caches are cold. Explain why later runs may be faster even after unloading because the operating system can keep file pages warm. Include guidance for keeping comparisons fair: use the same model, quantization, prompt, context size, max output tokens, sampling parameters, CPU thread count, GPU layer count, battery level, and temperature band."
+    },
+    {
+      "tokenTarget": 400,
+      "promptId": "PT400",
+      "prompt": "Create a detailed checklist for benchmarking on-device language model inference inside an Android application. Start with setup: verify the model file exists, record the device model, Android version, CPU cores, memory, battery level, charging state, screen state, and thermal status. Then describe model loading: capture start and end timestamps, native backend, thread count, GPU layer setting, context size, and load duration. Next describe prompt preparation: store the original prompt, engine-formatted prompt, character counts, target input-token preset, and measured tokenizer count. Explain prefill: the full input prompt must be evaluated before the first output token, so long prompts increase time to first token and may make the device feel busy. Explain decode: after prefill, the runtime normally evaluates one new token at a time, so streaming looks smoother. Add measurement rules: record prefill tokens per second, decode tokens per second, total generation time, output token target, actual output tokens, peak memory, battery drain, and final thermal state. End with comparison rules: run the same configuration multiple times, separate cold first-run metrics from warm steady-state metrics, avoid changing sampling settings between runs, and save crash reports when native failures happen."
+    },
+    {
+      "tokenTarget": 500,
+      "promptId": "PT500",
+      "prompt": "Draft an engineering note for an Android benchmark app that compares local language model inference engines. The note should describe the complete flow from selecting an engine to saving a JSON report. Include engine selection, model selection, quantization, local model path, context size, maximum output tokens, CPU thread count, GPU layer count, prompt-token preset, editable prompt text, condition labels, RAM sampling interval, temperature, top-k, top-p, and seed. Explain that the benchmark should load the model once, tokenize the prompt, run one or more consecutive generations, collect telemetry during load and inference, unload the model, then save structured results. Describe why prefill is the expensive phase before the first token: the model must process every input token and populate attention memory. Describe why decode is usually smoother: each step handles the previous generated token and streams text incrementally. Discuss UI behavior: keep native work off the main thread, lower worker priority, avoid using every CPU core, consider reducing GPU offload if rendering janks, and show clear status while prefill is running. Discuss reliability: validate context size against input plus output target, chunk large prompt batches, capture native process exits, show crash reports in the report screen, and keep failed runs visible. Finally, explain how to interpret results: compare prefill throughput for prompt-processing speed, decode throughput for generation speed, time to first token for responsiveness, peak memory for capacity, and battery or thermal changes for sustained-use cost."
+    },
+    {
+      "tokenTarget": 600,
+      "promptId": "PT600",
+      "prompt": "Write a comprehensive test scenario for evaluating a local LLM benchmark application on Android. The scenario should be useful for developers who need repeatable measurements and clear failure reports. Begin by describing the user workflow: choose llama.cpp or ONNX Runtime, choose a downloaded model, inspect quantization, select a prompt-token preset, optionally edit the prompt, choose context size and output limit, tune CPU threads and GPU layers, set sampling values, and start the benchmark. Describe what the app should do during model load: record timestamps, backend name, resolved thread count, GPU layer behavior, memory after load, and any fallback from GPU to CPU. Describe what happens before the first token: the prompt is formatted for the model, tokenized, checked against the context window, and prefetched through the model in bounded batches. Explain that this stage may make the device feel slow because CPU cores, memory bandwidth, storage page cache, and GPU drivers can all be active at once. Describe what happens after the first token: generated tokens are sampled, accepted by the sampler, decoded one by one, streamed to the listener, and counted for throughput. Include a section on smooth UI behavior: leave CPU cores free, lower worker priority, avoid excessive GPU contention, display status text, and measure prefill separately from decode. Include a section on reports: save prompt ID, prompt text, target prompt-token preset, measured input tokens, output target, actual output tokens, prefill speed, decode speed, time to first token, total duration, model load and unload times, peak RAM, battery drain, device identity, condition, backend, and crash reports if any exist. Finish with analysis guidance: compare cold and warm runs separately, avoid mixing different prompts or thread settings, treat actual tokenizer counts as authoritative, and investigate crashes using the saved native process exit JSON."
+    }
+  ]
+}

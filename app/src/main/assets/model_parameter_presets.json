@@ -6,6 +6,7 @@
     "prompt": "Explain how an Android application can benchmark an on-device language model. Include the role of prefill throughput, decode throughput, time to first token, model load time, app memory, battery drain, and thermal status. Keep the answer practical and focused on reproducible measurements.",
     "consecutiveGenerations": 1,
     "ramSamplingIntervalSeconds": 5,
+    "cpuThreads": 0,
     "temperature": 0.7,
     "topK": 40,
     "topP": 0.9,

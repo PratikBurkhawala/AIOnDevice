@@ -316,6 +316,7 @@ class BenchmarkRunner(
                 generationConfig = generationConfig,
                 prompt = PromptJson(
                     promptId = config.promptId,
+                    tokenTarget = config.promptTokenTarget,
                     inputTokenCount = promptInputTokenCount,
                     outputTokenTarget = config.generation.maxOutputTokens,
                     text = config.prompt,
@@ -407,6 +408,7 @@ class BenchmarkRunner(
             generationConfig = GenerationConfigJson.from(config.generation),
             prompt = PromptJson(
                 promptId = config.promptId,
+                tokenTarget = config.promptTokenTarget,
                 inputTokenCount = null,
                 outputTokenTarget = config.generation.maxOutputTokens,
                 text = config.prompt,
@@ -480,6 +482,7 @@ class BenchmarkRunner(
             generationConfig = generationConfig,
             prompt = PromptJson(
                 promptId = config.promptId,
+                tokenTarget = config.promptTokenTarget,
                 inputTokenCount = promptInputTokenCount,
                 outputTokenTarget = config.generation.maxOutputTokens,
                 text = config.prompt,

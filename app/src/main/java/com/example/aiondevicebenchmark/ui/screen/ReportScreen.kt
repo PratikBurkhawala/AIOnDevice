@@ -51,7 +51,11 @@ fun ReportScreen(
             Text("No saved JSON files yet.")
         } else {
             if (crashReports.isNotEmpty()) {
-                CrashReports(crashReports = crashReports, onEvent = onEvent)
+                CrashReports(
+                    crashReports = crashReports,
+                    onEvent = onEvent,
+                    includeRawPreview = false,
+                )
             }
             if (files.isNotEmpty()) {
                 ReportTable(files = files)
@@ -74,7 +78,11 @@ fun CrashReportScreen(
                 style = MaterialTheme.typography.bodySmall,
             )
         } else {
-            CrashReports(crashReports = crashReports, onEvent = onEvent)
+            CrashReports(
+                crashReports = crashReports,
+                onEvent = onEvent,
+                includeRawPreview = true,
+            )
         }
     }
 }
@@ -83,10 +91,11 @@ fun CrashReportScreen(
 private fun CrashReports(
     crashReports: List<SavedCrashReport>,
     onEvent: (BenchmarkUiEvent) -> Unit,
+    includeRawPreview: Boolean,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionTitle("Crash Reports")
-        crashReports.take(3).forEach { crash ->
+        SectionTitle("Crash Reports (${crashReports.size})")
+        crashReports.forEach { crash ->
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -98,11 +107,13 @@ private fun CrashReports(
                 Text("${crash.exception}: ${crash.message}", style = MaterialTheme.typography.bodySmall)
                 Text("Thread: ${crash.thread}", style = MaterialTheme.typography.bodySmall)
                 Text("File: ${crash.absolutePath}", style = MaterialTheme.typography.bodySmall)
-                SelectionContainer {
-                    Text(
-                        text = crash.rawJson.take(1400),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+                if (includeRawPreview) {
+                    SelectionContainer {
+                        Text(
+                            text = crash.rawJson.take(1400),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedButton(onClick = { onEvent(BenchmarkUiEvent.ShareCrashReport(crash.absolutePath)) }) {
@@ -130,6 +141,7 @@ private fun ReportTable(files: List<SavedJsonFile>) {
                 "Backend",
                 "Measurement",
                 "Evidence",
+                "Input tokens",
                 "Prefill tok/s",
                 "Decode tok/s",
                 "TTFT",
@@ -151,6 +163,7 @@ private fun ReportTable(files: List<SavedJsonFile>) {
                     record.runtime.backend,
                     record.runtime.measurementStatus,
                     record.hardware.profiling.evidence.orEmpty(),
+                    record.prompt.inputTokenCount?.toString().orEmpty(),
                     formatDouble(record.inference.prefill.tokensPerSecond),
                     formatDouble(record.inference.decode.tokensPerSecond),
                     formatSeconds(record.inference.ttftMs),
@@ -175,7 +188,7 @@ private fun ReportRow(values: List<String>, header: Boolean) {
                 4 -> 180.dp
                 5 -> 220.dp
                 6 -> 320.dp
-                12 -> 180.dp
+                13 -> 180.dp
                 else -> 120.dp
             }
             Text(

@@ -27,6 +27,7 @@ data class BenchmarkConfig(
     ),
     val condition: BenchmarkCondition = BenchmarkCondition.NORMAL_COLD,
     val promptId: String = "P001",
+    val promptTokenTarget: Int = 100,
     val prompt: String = DefaultPrompt.text,
     val consecutiveGenerations: Int = 1,
     val ramSamplingIntervalSeconds: Int = 60,

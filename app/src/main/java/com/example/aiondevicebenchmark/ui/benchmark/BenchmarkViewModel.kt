@@ -14,10 +14,12 @@ import com.example.aiondevicebenchmark.domain.usecase.GetDefaultModelForEngineUs
 import com.example.aiondevicebenchmark.domain.usecase.GetModelStorageDirectoryUseCase
 import com.example.aiondevicebenchmark.domain.usecase.GetModelsForEngineUseCase
 import com.example.aiondevicebenchmark.domain.usecase.GetModelParameterPresetUseCase
+import com.example.aiondevicebenchmark.domain.usecase.GetPromptTokenPresetUseCase
 import com.example.aiondevicebenchmark.domain.usecase.GetSupportedEnginesUseCase
 import com.example.aiondevicebenchmark.domain.usecase.LocalizeModelUseCase
 import com.example.aiondevicebenchmark.domain.usecase.ListSavedJsonFilesUseCase
 import com.example.aiondevicebenchmark.domain.usecase.ListCrashReportsUseCase
+import com.example.aiondevicebenchmark.domain.usecase.ListPromptTokenPresetsUseCase
 import com.example.aiondevicebenchmark.domain.usecase.ObserveModelDownloadsUseCase
 import com.example.aiondevicebenchmark.domain.usecase.RefreshModelDownloadsUseCase
 import com.example.aiondevicebenchmark.domain.usecase.ShareReportCsvUseCase
@@ -49,6 +51,8 @@ class BenchmarkViewModel(
     private val getModelsForEngineUseCase: GetModelsForEngineUseCase,
     private val getDefaultModelForEngineUseCase: GetDefaultModelForEngineUseCase,
     private val getModelParameterPresetUseCase: GetModelParameterPresetUseCase,
+    private val listPromptTokenPresetsUseCase: ListPromptTokenPresetsUseCase,
+    private val getPromptTokenPresetUseCase: GetPromptTokenPresetUseCase,
     private val detectModelQuantizationUseCase: DetectModelQuantizationUseCase,
     private val observeModelDownloadsUseCase: ObserveModelDownloadsUseCase,
     private val refreshModelDownloadsUseCase: RefreshModelDownloadsUseCase,
@@ -57,7 +61,8 @@ class BenchmarkViewModel(
     private val localizeModelUseCase: LocalizeModelUseCase,
     private val getModelStorageDirectoryUseCase: GetModelStorageDirectoryUseCase,
 ) : ViewModel() {
-    private val initialConfig = applyPreset(BenchmarkConfig())
+    private val promptTokenPresets = listPromptTokenPresetsUseCase()
+    private val initialConfig = applyPromptPreset(applyPreset(BenchmarkConfig()))
 
     private val _uiState = MutableStateFlow(
         BenchmarkUiState(
@@ -65,6 +70,7 @@ class BenchmarkViewModel(
             supportedEngines = getSupportedEnginesUseCase(),
             supportedModels = getModelsForEngineUseCase(initialConfig.engineType),
             modelStorageDirectory = getModelStorageDirectoryUseCase(initialConfig.engineType),
+            promptTokenPresets = promptTokenPresets,
         ),
     )
     val uiState: StateFlow<BenchmarkUiState> = _uiState.asStateFlow()
@@ -112,15 +118,18 @@ class BenchmarkViewModel(
             BenchmarkUiEvent.ClearMessage -> _uiState.update { it.copy(message = null) }
             is BenchmarkUiEvent.UpdateEngine -> update {
                 val model = getDefaultModelForEngineUseCase(event.value)
-                applyPreset(it.copy(engineType = event.value, model = prepareModel(model)))
+                applyPromptPreset(applyPreset(it.copy(engineType = event.value, model = prepareModel(model))))
             }
             is BenchmarkUiEvent.UpdateModel -> update { config ->
                 val model = getModelsForEngineUseCase(config.engineType)
                     .firstOrNull { model -> model.name == event.value }
                     ?: getDefaultModelForEngineUseCase(config.engineType)
-                applyPreset(config.copy(model = prepareModel(model)))
+                applyPromptPreset(applyPreset(config.copy(model = prepareModel(model))))
             }
             is BenchmarkUiEvent.UpdateCondition -> update { it.copy(condition = event.value) }
+            is BenchmarkUiEvent.UpdatePromptTokenPreset -> update { config ->
+                applyPromptPreset(config.copy(promptTokenTarget = event.tokenTarget))
+            }
             is BenchmarkUiEvent.UpdatePrompt -> update { it.copy(prompt = event.value) }
             is BenchmarkUiEvent.UpdateMaxOutputTokens -> updateGenerationInt(
                 value = event.value,
@@ -162,6 +171,19 @@ class BenchmarkViewModel(
                             current.config
                         } else {
                             current.config.copy(model = current.config.model.copy(gpuLayers = parsed))
+                        },
+                    )
+                }
+            }
+            is BenchmarkUiEvent.UpdateLlamaCpuThreads -> {
+                _uiState.update { current ->
+                    val parsed = event.value.toIntOrNull()?.coerceIn(0, 128)
+                    current.copy(
+                        llamaCpuThreadsInput = event.value,
+                        config = if (parsed == null) {
+                            current.config
+                        } else {
+                            current.config.copy(model = current.config.model.copy(cpuThreads = parsed))
                         },
                     )
                 }
@@ -358,6 +380,7 @@ class BenchmarkViewModel(
                 generationsInput = config.consecutiveGenerations.toString(),
                 ramSamplingIntervalInput = config.ramSamplingIntervalSeconds.toString(),
                 llamaGpuLayersInput = config.model.gpuLayers.toString(),
+                llamaCpuThreadsInput = config.model.cpuThreads.toString(),
                 temperatureInput = config.generation.temperature.toString(),
                 topKInput = config.generation.topK.toString(),
                 topPInput = config.generation.topP.toString(),
@@ -381,6 +404,7 @@ class BenchmarkViewModel(
             model = config.model.copy(
                 contextSize = preset.contextSize.coerceIn(128, 8192),
                 gpuLayers = preset.gpuLayers.coerceIn(-1, 128),
+                cpuThreads = preset.cpuThreads.coerceIn(0, 128),
             ),
             condition = condition,
             promptId = preset.promptId,
@@ -394,6 +418,17 @@ class BenchmarkViewModel(
                 topP = preset.topP.coerceIn(0.0, 1.0),
                 seed = preset.seed,
             ),
+        )
+    }
+
+    private fun applyPromptPreset(config: BenchmarkConfig): BenchmarkConfig {
+        val preset = getPromptTokenPresetUseCase(config.promptTokenTarget)
+            ?: promptTokenPresets.firstOrNull()
+            ?: return config
+        return config.copy(
+            promptTokenTarget = preset.tokenTarget,
+            promptId = preset.promptId,
+            prompt = preset.prompt,
         )
     }
 

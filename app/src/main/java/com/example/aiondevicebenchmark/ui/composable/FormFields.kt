@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import com.example.aiondevicebenchmark.data.PromptTokenPreset
 import com.example.aiondevicebenchmark.llm.EngineType
 import com.example.aiondevicebenchmark.llm.ModelConfig
 
@@ -76,6 +77,38 @@ fun ModelDropdown(
                 DropdownMenuItem(text = { Text(model.name) }, onClick = {
                     expanded = false
                     onSelected(model.name)
+                })
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PromptTokenDropdown(
+    selectedTokenTarget: Int,
+    options: List<PromptTokenPreset>,
+    enabled: Boolean,
+    onSelected: (Int) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { if (enabled) expanded = !expanded }) {
+        OutlinedTextField(
+            value = selectedTokenTarget.toString(),
+            onValueChange = {},
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth(),
+            readOnly = true,
+            enabled = enabled && options.isNotEmpty(),
+            label = { Text("Input token prompt") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { preset ->
+                DropdownMenuItem(text = { Text(preset.tokenTarget.toString()) }, onClick = {
+                    expanded = false
+                    onSelected(preset.tokenTarget)
                 })
             }
         }

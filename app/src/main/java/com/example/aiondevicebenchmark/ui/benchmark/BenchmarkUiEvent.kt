@@ -21,12 +21,14 @@ sealed interface BenchmarkUiEvent {
     data class UpdateEngine(val value: EngineType) : BenchmarkUiEvent
     data class UpdateModel(val value: String) : BenchmarkUiEvent
     data class UpdateCondition(val value: BenchmarkCondition) : BenchmarkUiEvent
+    data class UpdatePromptTokenPreset(val tokenTarget: Int) : BenchmarkUiEvent
     data class UpdatePrompt(val value: String) : BenchmarkUiEvent
     data class UpdateMaxOutputTokens(val value: String) : BenchmarkUiEvent
     data class UpdateContextSize(val value: String) : BenchmarkUiEvent
     data class UpdateConsecutiveGenerations(val value: String) : BenchmarkUiEvent
     data class UpdateRamSamplingInterval(val value: String) : BenchmarkUiEvent
     data class UpdateLlamaGpuLayers(val value: String) : BenchmarkUiEvent
+    data class UpdateLlamaCpuThreads(val value: String) : BenchmarkUiEvent
     data class UpdateTemperature(val value: String) : BenchmarkUiEvent
     data class UpdateTopK(val value: String) : BenchmarkUiEvent
     data class UpdateTopP(val value: String) : BenchmarkUiEvent

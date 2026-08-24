@@ -125,6 +125,7 @@ data class ModelJson(
     val fileSizeBytes: Long?,
     val contextSize: Int,
     val gpuLayers: Int,
+    val cpuThreads: Int = 0,
     val maxOutputTokens: Int,
 ) {
     companion object {
@@ -141,6 +142,7 @@ data class ModelJson(
                 fileSizeBytes = fileSize,
                 contextSize = model.contextSize,
                 gpuLayers = model.gpuLayers,
+                cpuThreads = model.cpuThreads,
                 maxOutputTokens = maxOutputTokens,
             )
         }
@@ -169,6 +171,7 @@ data class GenerationConfigJson(
 @Serializable
 data class PromptJson(
     val promptId: String,
+    val tokenTarget: Int?,
     val inputTokenCount: Int?,
     val outputTokenTarget: Int,
     val text: String = "",

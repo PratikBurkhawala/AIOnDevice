@@ -1,5 +1,6 @@
 package com.example.aiondevicebenchmark.llama
 
+import android.os.Process
 import com.example.aiondevicebenchmark.llm.EngineInfo
 import com.example.aiondevicebenchmark.llm.GenerationConfig
 import com.example.aiondevicebenchmark.llm.GenerationListener
@@ -54,6 +55,7 @@ internal class LlamaCppEngine : LlmEngine {
                         modelPath = model.filePath,
                         contextSize = model.contextSize,
                         maxOutputTokens = 512,
+                        cpuThreads = model.cpuThreads,
                         gpuLayers = model.gpuLayers,
                     )
                 }
@@ -256,7 +258,10 @@ internal class LlamaCppEngine : LlmEngine {
 
     private object NativeThreadFactory : ThreadFactory {
         override fun newThread(runnable: Runnable): Thread {
-            return Thread(runnable, "llama-native-worker").apply {
+            return Thread({
+                Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)
+                runnable.run()
+            }, "llama-native-worker").apply {
                 isDaemon = true
             }
         }

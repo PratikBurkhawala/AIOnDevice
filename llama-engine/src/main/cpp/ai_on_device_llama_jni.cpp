@@ -220,6 +220,47 @@ static llama_sampler * make_sampler(const float temperature, const int top_k, co
     return sampler;
 }
 
+static bool decode_tokens_in_chunks(
+    LlamaSession * session,
+    llama_token * tokens,
+    const int32_t token_count,
+    const bool encoder,
+    std::string & error
+) {
+    const int32_t max_batch = std::max<int32_t>(1, static_cast<int32_t>(llama_n_batch(session->ctx)));
+    for (int32_t offset = 0; offset < token_count; offset += max_batch) {
+        if (session->abort_requested.load()) {
+            error = encoder ? "llama.cpp encoder prefill aborted" : "llama.cpp prompt prefill aborted";
+            return false;
+        }
+
+        const int32_t chunk_size = std::min(max_batch, token_count - offset);
+        llama_batch batch = llama_batch_get_one(tokens + offset, chunk_size);
+        const int status = encoder
+            ? llama_encode(session->ctx, batch)
+            : llama_decode(session->ctx, batch);
+        if (status != 0) {
+            error = encoder ? "llama.cpp encoder prefill failed" : "llama.cpp prompt prefill failed";
+            return false;
+        }
+    }
+    return true;
+}
+
+static int resolve_thread_count(const int requested_threads) {
+    const int cores = std::max(1, static_cast<int>(std::thread::hardware_concurrency()));
+    if (requested_threads > 0) {
+        return std::max(1, std::min(requested_threads, cores));
+    }
+    if (cores <= 2) {
+        return 1;
+    }
+    if (cores <= 4) {
+        return cores - 1;
+    }
+    return cores - 2;
+}
+
 static bool has_handle(const jlong handle) {
     return handle != 0L;
 }
@@ -374,6 +415,7 @@ Java_com_example_aiondevicebenchmark_llama_NativeLlamaBridge_loadModel(
     jstring j_model_path,
     jint context_size,
     jint max_output_tokens,
+    jint requested_cpu_threads,
     jint requested_gpu_layers
 ) {
     try {
@@ -399,15 +441,16 @@ Java_com_example_aiondevicebenchmark_llama_NativeLlamaBridge_loadModel(
         const uint32_t n_ctx = static_cast<uint32_t>(std::max(prompt_capacity, prompt_capacity + prediction_capacity));
         const uint32_t n_batch = std::min<uint32_t>(n_ctx, 256);
         const uint32_t n_ubatch = std::min<uint32_t>(n_batch, 128);
-        const int threads = std::max(1, static_cast<int>(std::thread::hardware_concurrency()));
+        const int threads = resolve_thread_count(static_cast<int>(requested_cpu_threads));
         const int gpu_layers = requested_gpu_layers < 0 ? -1 : requested_gpu_layers;
 
         LOGI(
-            "llama.cpp load config: n_ctx=%u n_batch=%u n_ubatch=%u threads=%d gpu_layers=%d",
+            "llama.cpp load config: n_ctx=%u n_batch=%u n_ubatch=%u threads=%d requested_threads=%d gpu_layers=%d",
             n_ctx,
             n_batch,
             n_ubatch,
             threads,
+            static_cast<int>(requested_cpu_threads),
             gpu_layers
         );
 
@@ -577,24 +620,32 @@ Java_com_example_aiondevicebenchmark_llama_NativeLlamaBridge_generate(
 
         const auto total_start = Clock::now();
         const auto prefill_start = Clock::now();
-        llama_batch batch = llama_batch_get_one(prompt_tokens.data(), static_cast<int32_t>(prompt_tokens.size()));
 
         if (llama_model_has_encoder(session->model)) {
-            if (llama_encode(session->ctx, batch) != 0) {
-                return make_failure(env, "llama.cpp encoder prefill failed");
+            if (!decode_tokens_in_chunks(
+                    session,
+                    prompt_tokens.data(),
+                    static_cast<int32_t>(prompt_tokens.size()),
+                    true,
+                    error
+                )) {
+                return make_failure(env, error);
             }
             llama_token decoder_start_token = llama_model_decoder_start_token(session->model);
             if (decoder_start_token == LLAMA_TOKEN_NULL) {
                 decoder_start_token = llama_vocab_bos(session->vocab);
             }
-            batch = llama_batch_get_one(&decoder_start_token, 1);
-        }
-
-        if (llama_decode(session->ctx, batch) != 0) {
-            const std::string message = session->abort_requested.load()
-                ? "llama.cpp prompt prefill aborted"
-                : "llama.cpp prompt prefill failed";
-            return make_failure(env, message);
+            if (!decode_tokens_in_chunks(session, &decoder_start_token, 1, false, error)) {
+                return make_failure(env, error);
+            }
+        } else if (!decode_tokens_in_chunks(
+                session,
+                prompt_tokens.data(),
+                static_cast<int32_t>(prompt_tokens.size()),
+                false,
+                error
+            )) {
+            return make_failure(env, error);
         }
         const auto prefill_end = Clock::now();
 
@@ -636,7 +687,7 @@ Java_com_example_aiondevicebenchmark_llama_NativeLlamaBridge_generate(
             }
 
             llama_sampler_accept(sampler.get(), token);
-            batch = llama_batch_get_one(&token, 1);
+            llama_batch batch = llama_batch_get_one(&token, 1);
             if (llama_decode(session->ctx, batch) != 0) {
                 const std::string message = session->abort_requested.load()
                     ? "llama.cpp decode aborted"

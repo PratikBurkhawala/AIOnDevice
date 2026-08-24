@@ -48,6 +48,7 @@ data class ModelConfig(
     val fileSizeBytes: Long? = null,
     val contextSize: Int = 2048,
     val gpuLayers: Int = -1,
+    val cpuThreads: Int = 0,
     val downloadUrl: String = "",
     val downloadSizeLabel: String = "",
     val description: String = "",

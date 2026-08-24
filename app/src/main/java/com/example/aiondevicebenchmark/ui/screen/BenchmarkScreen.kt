@@ -31,6 +31,7 @@ import com.example.aiondevicebenchmark.ui.composable.KeyValueRow
 import com.example.aiondevicebenchmark.ui.composable.MainMetrics
 import com.example.aiondevicebenchmark.ui.composable.ModelDropdown
 import com.example.aiondevicebenchmark.ui.composable.NumericField
+import com.example.aiondevicebenchmark.ui.composable.PromptTokenDropdown
 import com.example.aiondevicebenchmark.ui.composable.SectionTitle
 
 @Composable
@@ -94,16 +95,6 @@ private fun BenchmarkConfigScreen(
             label = { Text("Local model path") },
         )
         KeyValueRow("Acceleration", "llama.cpp uses Vulkan GPU when available. ONNX Runtime tries NNAPI and otherwise uses CPU.")
-        if (config.engineType == EngineType.LLAMA_CPP) {
-            NumericField(
-                "GPU layers (-1 all, 0 CPU)",
-                state.llamaGpuLayersInput,
-                enabled,
-                { onEvent(BenchmarkUiEvent.UpdateLlamaGpuLayers(it)) },
-                Modifier.fillMaxWidth(),
-                KeyboardType.Text,
-            )
-        }
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Condition", style = MaterialTheme.typography.labelLarge)
@@ -119,6 +110,12 @@ private fun BenchmarkConfigScreen(
             }
         }
 
+        PromptTokenDropdown(
+            selectedTokenTarget = config.promptTokenTarget,
+            options = state.promptTokenPresets,
+            enabled = enabled,
+            onSelected = { onEvent(BenchmarkUiEvent.UpdatePromptTokenPreset(it)) },
+        )
         OutlinedTextField(
             value = config.prompt,
             onValueChange = { onEvent(BenchmarkUiEvent.UpdatePrompt(it)) },
@@ -144,6 +141,25 @@ private fun BenchmarkConfigScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             NumericField("Top-P", state.topPInput, enabled, { onEvent(BenchmarkUiEvent.UpdateTopP(it)) }, Modifier.weight(1f), KeyboardType.Decimal)
             NumericField("Seed", state.seedInput, enabled, { onEvent(BenchmarkUiEvent.UpdateSeed(it)) }, Modifier.weight(1f))
+        }
+        if (config.engineType == EngineType.LLAMA_CPP) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                NumericField(
+                    "CPU threads (0 auto)",
+                    state.llamaCpuThreadsInput,
+                    enabled,
+                    { onEvent(BenchmarkUiEvent.UpdateLlamaCpuThreads(it)) },
+                    Modifier.weight(1f),
+                )
+                NumericField(
+                    "GPU layers (-1 all)",
+                    state.llamaGpuLayersInput,
+                    enabled,
+                    { onEvent(BenchmarkUiEvent.UpdateLlamaGpuLayers(it)) },
+                    Modifier.weight(1f),
+                    KeyboardType.Text,
+                )
+            }
         }
 
         Button(

@@ -4,6 +4,7 @@ import com.example.aiondevicebenchmark.benchmark.BenchmarkConfig
 import com.example.aiondevicebenchmark.benchmark.BenchmarkState
 import com.example.aiondevicebenchmark.data.SavedCrashReport
 import com.example.aiondevicebenchmark.data.SavedJsonFile
+import com.example.aiondevicebenchmark.data.PromptTokenPreset
 import com.example.aiondevicebenchmark.domain.model.ModelDownloadState
 import com.example.aiondevicebenchmark.llm.EngineType
 import com.example.aiondevicebenchmark.llm.ModelConfig
@@ -23,12 +24,14 @@ data class BenchmarkUiState(
     val supportedModels: List<ModelConfig> = emptyList(),
     val modelDownloads: Map<String, ModelDownloadState> = emptyMap(),
     val modelStorageDirectory: String = "",
+    val promptTokenPresets: List<PromptTokenPreset> = emptyList(),
     val message: String? = null,
     val maxOutputTokensInput: String = config.generation.maxOutputTokens.toString(),
     val contextSizeInput: String = config.model.contextSize.toString(),
     val generationsInput: String = config.consecutiveGenerations.toString(),
     val ramSamplingIntervalInput: String = config.ramSamplingIntervalSeconds.toString(),
     val llamaGpuLayersInput: String = config.model.gpuLayers.toString(),
+    val llamaCpuThreadsInput: String = config.model.cpuThreads.toString(),
     val temperatureInput: String = config.generation.temperature.toString(),
     val topKInput: String = config.generation.topK.toString(),
     val topPInput: String = config.generation.topP.toString(),
