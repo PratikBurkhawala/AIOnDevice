@@ -61,6 +61,7 @@ Default generation settings in code:
 | 1 | SmolLM2-1.7B-Instruct | Q8_0 | llama.cpp | GPU: Mali-G68 | 1.17 | 0.40 | 278.583 s | 2074 MB | 2% | 5.805 s | MEMORY_PRESSURE |
 | 1 | SmolLM2-1.7B-Instruct | Q8_0 | llama.cpp | GPU: Mali-G68 | 1.15 | 0.39 | 282.600 s | 2079 MB | 1% | 6.255 s | BATTERY_SAVER |
 | 1 | SmolLM2-1.7B-Instruct | Q8_0 | llama.cpp | GPU: Mali-G68 | 1.11 | 0.57 | 348.426 s | 2676 MB | 2% | 4.497 s | NORMAL_COLD |
+| 10 | SmolLM2-1.7B-Instruct | Q8_0 | llama.cpp | GPU: Mali-G68 | 1.21 | 0.41 | 270.842 s | 2104 MB | 19% | 6.096 s | SUSTAINED_LOAD |
 | 1 | Qwen2.5-0.5B-Instruct | Q4 | ONNX Runtime | ONNX Runtime NNAPI | 32.30 | 2.52 | 5.610 s | 142 MB | 0% | 7.674 s | NORMAL_COLD |
 | 1 | Qwen2.5-0.5B-Instruct | Q8 | ONNX Runtime | ONNX Runtime NNAPI | 39.28 | 1.60 | 4.630 s | 125 MB | 0% | 4.695 s | NORMAL_COLD |
 
@@ -71,7 +72,7 @@ Summary:
 | Qwen2.5 0.5B Q4_K_M / llama.cpp | 5 | 4.67 | 2.50 | 64.63 s | 382 MB | 1.35 s |
 | Qwen2.5 0.5B Q8_0 / llama.cpp | 5 | 4.38 | 2.50 | 62.03 s | 277 MB | 1.74 s |
 | SmolLM2 1.7B Q4_K_M / llama.cpp | 2 | 1.30 | 0.64 | 266.19 s | 1554 MB | 3.58 s |
-| SmolLM2 1.7B Q8_0 / llama.cpp | 3 | 1.15 | 0.45 | 303.20 s | 2276 MB | 5.52 s |
+| SmolLM2 1.7B Q8_0 / llama.cpp | 4 | 1.16 | 0.44 | 295.11 s | 2233 MB | 5.66 s |
 | Qwen2.5 0.5B Q4 / ONNX Runtime | 1 | 32.30 | 2.52 | 5.61 s | 142 MB | 7.67 s |
 | Qwen2.5 0.5B Q8 / ONNX Runtime | 1 | 39.28 | 1.60 | 4.63 s | 125 MB | 4.70 s |
 
@@ -89,6 +90,8 @@ Summary:
 
 **Surprise: Q4 was not always faster in every metric.** I expected Q4 to be consistently faster than Q8 because it moves less data. That held for SmolLM2 decode and memory, but Qwen Q8 had a much lower TTFT in the 10-generation sustained row. My explanation is that the single metric is affected by backend scheduling, cache state, run condition, and prompt processing, not only quantization. More repeated runs are needed before making a strong Q4-vs-Q8 claim.
 
+**Surprise: sustained SmolLM2 Q8 was the most expensive battery run.** The 10-generation SmolLM2 Q8_0 sustained-load row drained 19% battery, while the 10-generation Qwen rows drained 3-4%. My explanation is that the larger 1.7B Q8 model keeps the device under high load for much longer because decode stays around 0.41 tok/s and TTFT is still 270.842 seconds. The model is not just slower; it holds the device in the expensive state for longer.
+
 **Surprise: SmolLM2 1.7B was much heavier than Qwen2.5 0.5B on the same device.** SmolLM2 decode was around 0.39-0.67 tok/s, while Qwen llama.cpp decode was around 2.19-2.70 tok/s. My explanation is straightforward: the larger model needs more memory movement and compute per token. This is the clearest trend in the data.
 
 ### What I Couldn't Get Working
@@ -97,7 +100,7 @@ The ONNX path is now producing benchmark rows, but I still consider it experimen
 
 I also do not yet have a CPU-only baseline for the same prompts and models. The current llama.cpp rows use the reported Mali-G68 GPU backend, so I cannot prove from this report alone whether CPU, GPU, or partial offload gives the best balance of speed and UI responsiveness.
 
-I did not capture enough repeated runs per exact configuration to separate stable behavior from run-order effects, cache state, thermal state, or Android background activity. The 10-generation rows help, but a stronger report needs repeated trials under the same condition.
+I did not capture enough repeated runs per exact configuration to separate stable behavior from run-order effects, cache state, thermal state, or Android background activity. The 10-generation rows help and now include both Qwen and SmolLM2 sustained-load examples, but a stronger report still needs repeated trials under the same condition.
 
 ### What I'd Try Next With Another Week
 
@@ -109,9 +112,11 @@ Third, I would build a safer default-configuration table per model. Smaller Qwen
 
 Fourth, I would repeat every row at least 5-10 times and report median, p90, and min/max for TTFT, prefill tok/s, decode tok/s, peak RAM, load time, and battery drain.
 
-Fifth, I would improve completion handling. For benchmark comparability, a fixed output token cap is useful. For answer quality, the app should also record whether generation ended naturally or stopped because the output token limit was reached.
+Fifth, I would add stronger sustained-load reporting for battery and thermal behavior. The SmolLM2 Q8 10-generation run shows that the energy cost can become the main result, so the next report should include battery temperature, thermal status over time, and whether Android throttled the workload.
 
-Sixth, I would continue validating ONNX Runtime. The first-token numbers are strong, but I would check generated text quality, tokenizer correctness, NNAPI fallback behavior, and whether ONNX still wins after repeated warm and cold runs.
+Sixth, I would improve completion handling. For benchmark comparability, a fixed output token cap is useful. For answer quality, the app should also record whether generation ended naturally or stopped because the output token limit was reached.
+
+Seventh, I would continue validating ONNX Runtime. The first-token numbers are strong, but I would check generated text quality, tokenizer correctness, NNAPI fallback behavior, and whether ONNX still wins after repeated warm and cold runs.
 
 ## 1. Goal
 
