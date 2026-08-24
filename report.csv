@@ -1,0 +1,5 @@
+Run,Model,Quant,Runtime,Backend,Measurement status,Hardware evidence,Prefill tok/s,Decode tok/s,TTFT,Peak RAM,Battery drain,Load time,Device Name,Condition
+1,SmolLM2-1.7B-Instruct-Q8_0,Q8_0,llama.cpp,GPU: Mali-G68,NATIVE,GPU: Mali-G68 Measurement status: NATIVE,1.1123886174188,0.566652500354158,348.426 s,2676 MB,2,4.497 s,SM-A176B,NORMAL_COLD
+1,SmolLM2-1.7B-Instruct-Q4_K_M,Q4_K_M,llama.cpp,GPU: Mali-G68,NATIVE,GPU: Mali-G68 Measurement status: NATIVE,1.1491590649943,1.03783963301991,337.359 s,2026 MB,2,3.237 s,SM-A176B,NORMAL_COLD
+1,Qwen2.5-0.5B-Instruct-Q8_0,Q8_0,llama.cpp,GPU: Mali-G68,NATIVE,GPU: Mali-G68 Measurement status: NATIVE,4.53459513371837,2.70395876462884,86.229 s,116 MB,1,1.020 s,SM-A176B,NORMAL_COLD
+1,Qwen2.5-0.5B-Instruct-Q4_K_M,Q4_K_M,llama.cpp,GPU: Mali-G68,NATIVE,GPU: Mali-G68 Measurement status: NATIVE,4.59340710979535,2.80640210480158,85.126 s,109 MB,0,1.760 s,SM-A176B,NORMAL_COLD
