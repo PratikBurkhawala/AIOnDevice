@@ -38,7 +38,6 @@ struct GpuBackendInfo {
     bool available = false;
     std::string name;
     std::string diagnostics;
-    ggml_backend_dev_t device = nullptr;
 };
 
 struct LoadedSession {
@@ -263,7 +262,7 @@ static GpuBackendInfo find_gpu_backend() {
 
     const size_t device_count = ggml_backend_dev_count();
     if (device_count == 0) {
-        return GpuBackendInfo{false, "", backend_diagnostics + "; devices: none", nullptr};
+        return GpuBackendInfo{false, "", backend_diagnostics + "; devices: none"};
     }
 
     std::string diagnostics = backend_diagnostics + "; devices:";
@@ -301,10 +300,10 @@ static GpuBackendInfo find_gpu_backend() {
         );
 
         if (props.type == GGML_BACKEND_DEVICE_TYPE_GPU || props.type == GGML_BACKEND_DEVICE_TYPE_IGPU) {
-            return GpuBackendInfo{true, display_name, diagnostics, device};
+            return GpuBackendInfo{true, display_name, diagnostics};
         }
     }
-    return GpuBackendInfo{false, "", diagnostics, nullptr};
+    return GpuBackendInfo{false, "", diagnostics};
 }
 
 static LoadedSession try_load_session(
@@ -312,19 +311,10 @@ static LoadedSession try_load_session(
     const uint32_t n_ctx,
     const uint32_t n_batch,
     const int threads,
-    const bool prefer_gpu,
-    ggml_backend_dev_t gpu_device
+    const bool prefer_gpu
 ) {
     llama_model_params model_params = llama_model_default_params();
     model_params.n_gpu_layers = prefer_gpu ? -1 : 0;
-    std::vector<ggml_backend_dev_t> devices;
-    if (prefer_gpu && gpu_device) {
-        devices.push_back(gpu_device);
-        devices.push_back(nullptr);
-        model_params.devices = devices.data();
-        model_params.split_mode = LLAMA_SPLIT_MODE_NONE;
-        model_params.main_gpu = 0;
-    }
 
     llama_model * model = llama_model_load_from_file(model_path.c_str(), model_params);
     if (!model) {
@@ -401,7 +391,7 @@ Java_com_example_aiondevicebenchmark_llama_NativeLlamaBridge_loadModel(
         std::string backend = "CPU";
         if (gpu.available) {
             LOGI("llama.cpp GPU backend available: %s", gpu.name.c_str());
-            loaded = try_load_session(model_path, n_ctx, n_batch, threads, true, gpu.device);
+            loaded = try_load_session(model_path, n_ctx, n_batch, threads, true);
             if (loaded.session) {
                 backend = "GPU: " + gpu.name;
             } else {
@@ -412,7 +402,7 @@ Java_com_example_aiondevicebenchmark_llama_NativeLlamaBridge_loadModel(
         }
 
         if (!loaded.session) {
-            loaded = try_load_session(model_path, n_ctx, n_batch, threads, false, nullptr);
+            loaded = try_load_session(model_path, n_ctx, n_batch, threads, false);
             backend = gpu.available
                 ? "CPU (GPU fallback: " + gpu.name + ")"
                 : "CPU (GPU unavailable)";
